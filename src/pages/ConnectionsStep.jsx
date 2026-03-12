@@ -1,0 +1,178 @@
+import { useState, Suspense } from 'react';
+import useTwinStore from '../store/useTwinStore';
+import Scene3D from '../components/Scene3D';
+import { ChevronRight, ArrowLeft, Link2, Zap, Wifi } from 'lucide-react';
+
+const STATUS_COLORS = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
+const FLOW_LABELS = { green: 'Fluid', orange: 'Congested', red: 'Bottleneck' };
+
+export default function ConnectionsStep() {
+    const { setStep, components, connections, selectedDomain } = useTwinStore();
+    const [hoveredConn, setHoveredConn] = useState(null);
+
+    const DOMAIN_LINK_TYPES = {
+        factory: { label: 'Production Flow', desc: 'Parts pass from machine A to B', icon: '⚙️' },
+        airport: { label: 'Passenger Flow', desc: 'Terminal → Gate → Runway', icon: '✈️' },
+        warehouse: { label: 'Picking Route', desc: 'Reception → Rack → Shipping', icon: '📦' },
+    };
+    const linkType = DOMAIN_LINK_TYPES[selectedDomain] || DOMAIN_LINK_TYPES.factory;
+
+    const getComp = (id) => components.find(c => c.id === id);
+
+    return (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Split */}
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '320px 1fr', overflow: 'hidden' }}>
+
+                {/* Left — connection panel */}
+                <div style={{
+                    borderRight: '1px solid var(--border)',
+                    display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                    background: 'rgba(7,10,20,0.85)',
+                }}>
+                    <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                            <Link2 size={15} color="var(--accent)" />
+                            <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.04em' }}>Connections</span>
+                        </div>
+                        <div style={{
+                            padding: '12px', borderRadius: '8px',
+                            background: 'rgba(99,149,255,0.06)', border: '1px solid rgba(99,149,255,0.15)',
+                        }}>
+                            <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, marginBottom: '4px' }}>
+                                {linkType.icon} {linkType.label}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-1)' }}>{linkType.desc}</div>
+                        </div>
+                    </div>
+
+                    {/* Connection list */}
+                    <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
+                        {connections.length === 0 ? (
+                            <div style={{ textAlign: 'center', color: 'var(--text-2)', fontSize: '13px', padding: '40px 20px' }}>
+                                No connections yet.<br />They will be auto-detected from your layout.
+                            </div>
+                        ) : (
+                            connections.map((conn, i) => {
+                                const src = getComp(conn.sourceId);
+                                const tgt = getComp(conn.targetId);
+                                const color = STATUS_COLORS[conn.flowStatus];
+                                return (
+                                    <div
+                                        key={conn.id}
+                                        onMouseEnter={() => setHoveredConn(conn.id)}
+                                        onMouseLeave={() => setHoveredConn(null)}
+                                        style={{
+                                            padding: '12px',
+                                            borderRadius: '10px',
+                                            marginBottom: '8px',
+                                            border: hoveredConn === conn.id ? `1px solid ${color}55` : '1px solid var(--border)',
+                                            background: hoveredConn === conn.id ? `rgba(${hexToRgb(color)},0.06)` : 'var(--bg-3)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                            <span style={{ fontSize: '11px', color: 'var(--text-2)', fontWeight: 600 }}>LINK {i + 1}</span>
+                                            <span className={`badge badge-${conn.flowStatus}`} style={{ marginLeft: 'auto' }}>
+                                                <span className={`dot dot-${conn.flowStatus}`} />
+                                                {FLOW_LABELS[conn.flowStatus]}
+                                            </span>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <div style={{
+                                                padding: '4px 8px', borderRadius: '6px',
+                                                background: 'var(--bg-4)', fontSize: '11px',
+                                                fontWeight: 600, color: 'var(--text-0)', flex: 1,
+                                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                            }}>
+                                                {src?.name || conn.sourceId}
+                                            </div>
+                                            <div style={{ color: color, flexShrink: 0 }}>→</div>
+                                            <div style={{
+                                                padding: '4px 8px', borderRadius: '6px',
+                                                background: 'var(--bg-4)', fontSize: '11px',
+                                                fontWeight: 600, color: 'var(--text-0)', flex: 1,
+                                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                            }}>
+                                                {tgt?.name || conn.targetId}
+                                            </div>
+                                        </div>
+
+                                        {/* Flow visualization */}
+                                        <div style={{ marginTop: '8px', height: '3px', borderRadius: '2px', background: 'var(--bg-4)', overflow: 'hidden' }}>
+                                            <div style={{
+                                                height: '100%',
+                                                width: conn.flowStatus === 'green' ? '80%' : conn.flowStatus === 'orange' ? '50%' : '20%',
+                                                background: `linear-gradient(90deg, ${color}, transparent)`,
+                                                transition: 'width 0.5s',
+                                            }} />
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    {/* Legend */}
+                    <div style={{ padding: '16px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-2)', fontWeight: 600, marginBottom: '8px', letterSpacing: '0.06em' }}>
+                            FLOW LEGEND
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                            {[
+                                { status: 'green', label: 'Fluid Flow', icon: '●' },
+                                { status: 'orange', label: 'Congested', icon: '●' },
+                                { status: 'red', label: 'Bottleneck', icon: '●' },
+                            ].map(l => (
+                                <div key={l.status} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                                    <span style={{ color: STATUS_COLORS[l.status] }}>{l.icon}</span>
+                                    <span style={{ color: 'var(--text-1)' }}>{l.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right — 3D view */}
+                <div style={{ flex: 1, position: 'relative' }}>
+                    <Suspense fallback={<div style={{ color: 'var(--text-2)', padding: '40px', textAlign: 'center' }}>Loading…</div>}>
+                        <Scene3D />
+                    </Suspense>
+                    {/* Hint overlay */}
+                    <div style={{
+                        position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
+                        padding: '8px 16px', borderRadius: '100px',
+                        background: 'rgba(7,10,20,0.8)', border: '1px solid var(--border)',
+                        backdropFilter: 'blur(10px)',
+                        fontSize: '12px', color: 'var(--text-1)',
+                    }}>
+                        🔗 Connections rendered as animated tubes — hover for details
+                    </div>
+                </div>
+            </div>
+
+            {/* Footer nav */}
+            <div style={{
+                display: 'flex', justifyContent: 'space-between', padding: '12px 20px',
+                borderTop: '1px solid var(--border)', background: 'rgba(7,10,20,0.8)',
+                backdropFilter: 'blur(10px)', flexShrink: 0,
+            }}>
+                <button className="btn btn-ghost" onClick={() => setStep(2)}>
+                    <ArrowLeft size={16} /> Back
+                </button>
+                <button className="btn btn-primary" onClick={() => setStep(4)}>
+                    Next: Configure KPIs <ChevronRight size={16} />
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+        ? `${parseInt(result[1], 16)},${parseInt(result[2], 16)},${parseInt(result[3], 16)}`
+        : '99,149,255';
+}
