@@ -205,11 +205,10 @@ const useTwinStore = create((set, get) => ({
         set({ components, connections: generateConnections(components), kpis, kpiHistory });
     },
 
-    addComponent: (type) => {
+    addComponent: (type, overrides = {}) => {
         const { selectedDomain, gridCols, gridRows, components } = get();
-        const bp = getBlueprint(selectedDomain, type);
-        if (!bp) return;
-        const [w, h] = bp.gridSize;
+        const bp = getBlueprint(selectedDomain, type) || { name: type, gridSize: [2, 2], color: '#6395ff' };
+        const [w, h] = overrides.gridSize || bp.gridSize;
         const occupied = new Set();
         components.forEach(c => {
             const [cw, ch] = c.gridSize;
@@ -217,8 +216,26 @@ const useTwinStore = create((set, get) => ({
                 for (let cl = c.col; cl < c.col + cw; cl++)
                     occupied.add(`${r}-${cl}`);
         });
-        for (let row = 0; row < gridRows - h; row++) {
-            for (let col = 0; col < gridCols - w; col++) {
+
+        // If explicit position provided (from AI agent), use it
+        if (overrides.row !== undefined && overrides.col !== undefined) {
+            const newComp = {
+                id: `${type}_${++compIdCounter}`,
+                type,
+                name: overrides.name || `${bp.name} ${compIdCounter}`,
+                gridSize: overrides.gridSize || bp.gridSize,
+                color: overrides.color || bp.color,
+                col: overrides.col,
+                row: overrides.row,
+                kpiIds: [],
+            };
+            set(s => ({ components: [...s.components, newComp] }));
+            return;
+        }
+
+        // Auto-place: find first free cell
+        for (let row = 0; row < gridRows - h + 1; row++) {
+            for (let col = 0; col < gridCols - w + 1; col++) {
                 let ok = true;
                 for (let r = row; r < row + h && ok; r++)
                     for (let c = col; c < col + w && ok; c++)
@@ -230,6 +247,14 @@ const useTwinStore = create((set, get) => ({
                 }
             }
         }
+    },
+
+    removeComponent: (id) => {
+        set(s => ({
+            components: s.components.filter(c => c.id !== id),
+            connections: s.connections.filter(cn => cn.sourceId !== id && cn.targetId !== id),
+            selectedComponentId: s.selectedComponentId === id ? null : s.selectedComponentId,
+        }));
     },
 
     moveComponent: (id, newCol, newRow) => {

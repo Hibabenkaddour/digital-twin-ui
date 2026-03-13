@@ -1,156 +1,216 @@
 import { useState, useEffect, useRef } from 'react';
+import { nlqQuery, getQuerySuggestions, checkBackendHealth } from '../services/api';
+import DynamicChart from './DynamicChart';
 import useTwinStore from '../store/useTwinStore';
 
 export default function Chatbot() {
-    const { chatMessages, sendMessage, kpis } = useTwinStore();
-    const [input, setInput] = useState('');
-    const [isTyping, setIsTyping] = useState(false);
-    const bottomRef = useRef();
+  const { kpis, components, selectedComponentId } = useTwinStore();
+  const [messages, setMessages] = useState([
+    { id: 0, role: 'assistant', text: '👋 Hello! I\'m your **Analytics AI** powered by **Llama 3** running locally.\n\nAsk me anything about your KPIs — I\'ll analyze the data and generate charts automatically.', chart: null },
+  ]);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [backendOnline, setBackendOnline] = useState(null); // null=checking
+  const [timeRange, setTimeRange] = useState('24h');
+  const bottomRef = useRef();
 
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [chatMessages]);
+  // Check backend health + load suggestions
+  useEffect(() => {
+    checkBackendHealth().then(online => {
+      setBackendOnline(online);
+      if (online) {
+        getQuerySuggestions().then(s => setSuggestions(s.map(x => x.text))).catch(() => {});
+      }
+    });
+  }, []);
 
-    const handleSend = () => {
-        const text = input.trim();
-        if (!text) return;
-        setInput('');
-        setIsTyping(true);
-        sendMessage(text);
-        setTimeout(() => setIsTyping(false), 900);
-    };
+  // Default suggestions when no data
+  const defaultSuggestions = [
+    'What is the system status?',
+    'Show anomalies in the last 24h',
+    'Compare all KPI trends',
+    'Which component has the highest temperature?',
+  ];
+  const displaySuggestions = suggestions.length > 0 ? suggestions : defaultSuggestions;
 
-    const handleKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } };
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-    const suggestions = ['System status?', 'Critical alerts?', 'Recommendations?', 'KPI trends?'];
+  const critCount  = kpis.filter(k => k.status === 'red').length;
+  const warnCount  = kpis.filter(k => k.status === 'orange').length;
+  const okCount    = kpis.filter(k => k.status === 'green').length;
+  const selComp    = components.find(c => c.id === selectedComponentId);
 
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-1)' }}>
-            {/* Header */}
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg,#6395ff,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>
-                    🤖
-                </div>
-                <div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-0)' }}>Analytics AI</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10d98d', display: 'inline-block', animation: 'pulse 2s infinite' }} />
-                        Analyzing live KPI data
-                    </div>
-                </div>
-                {/* Live KPI count badge */}
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
-                    {[{ color: '#10d98d', count: kpis.filter(k => k.status === 'green').length, label: 'OK' },
-                    { color: '#f59e0b', count: kpis.filter(k => k.status === 'orange').length, label: 'Warn' },
-                    { color: '#ef4444', count: kpis.filter(k => k.status === 'red').length, label: 'Crit' }].map(({ color, count, label }) => (
-                        <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3px 7px', background: `${color}18`, borderRadius: '6px', border: `1px solid ${color}30` }}>
-                            <span style={{ fontSize: '13px', fontWeight: 800, color }}>{count}</span>
-                            <span style={{ fontSize: '9px', color: 'var(--text-2)' }}>{label}</span>
-                        </div>
-                    ))}
-                </div>
+  const handleSend = async (text) => {
+    const q = (text || input).trim();
+    if (!q) return;
+    setInput('');
+    const userMsg = { id: Date.now(), role: 'user', text: q, chart: null };
+    setMessages(prev => [...prev, userMsg]);
+    setIsTyping(true);
+
+    try {
+      if (backendOnline) {
+        // Real NLQ via backend
+        const result = await nlqQuery(q, {
+          componentId: selComp?.id,
+          timeRange,
+        });
+        setMessages(prev => [...prev, {
+          id: Date.now() + 1,
+          role: 'assistant',
+          text: result.answer,
+          chart: result.chart,
+        }]);
+      } else {
+        // Local mock fallback
+        await new Promise(r => setTimeout(r, 700));
+        setMessages(prev => [...prev, {
+          id: Date.now() + 1,
+          role: 'assistant',
+          text: buildLocalAnswer(q, kpis, components, selComp),
+          chart: null,
+        }]);
+      }
+    } catch (e) {
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        role: 'assistant',
+        text: `⚠️ Backend error: ${e.message}. Using local KPI data instead.\n\n${buildLocalAnswer(q, kpis, components, selComp)}`,
+        chart: null,
+      }]);
+    } finally {
+      setIsTyping(false);
+      // Refresh suggestions
+      if (backendOnline) getQuerySuggestions().then(s => setSuggestions(s.map(x => x.text))).catch(() => {});
+    }
+  };
+
+  const handleKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }};
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-1)' }}>
+      {/* Header */}
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg,#6395ff,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🦙</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-0)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Analytics AI · Llama 3
+              <span style={{
+                fontSize: '9px', padding: '1px 6px', borderRadius: '10px', fontWeight: 600,
+                background: backendOnline === null ? 'rgba(100,116,139,0.2)' : backendOnline ? 'rgba(16,217,141,0.15)' : 'rgba(245,158,11,0.15)',
+                color: backendOnline === null ? '#64748b' : backendOnline ? '#10d98d' : '#f59e0b',
+                border: `1px solid ${backendOnline === null ? '#64748b40' : backendOnline ? '#10d98d40' : '#f59e0b40'}`,
+              }}>
+                {backendOnline === null ? '⏳ connecting' : backendOnline ? '● live backend' : '○ local mode'}
+              </span>
             </div>
-
-            {/* Messages */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {chatMessages.map(msg => (
-                    <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                        <div style={{
-                            maxWidth: '88%',
-                            padding: '9px 13px',
-                            borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                            background: msg.role === 'user'
-                                ? 'linear-gradient(135deg,#6395ff,#8b5cf6)'
-                                : 'var(--bg-0)',
-                            border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
-                            fontSize: '12px',
-                            lineHeight: 1.55,
-                            color: msg.role === 'user' ? '#fff' : 'var(--text-1)',
-                            whiteSpace: 'pre-wrap',
-                        }}>
-                            {formatMessage(msg.text)}
-                        </div>
-                        <span style={{ fontSize: '10px', color: 'var(--text-2)', marginTop: '3px', marginLeft: '4px', marginRight: '4px' }}>
-                            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                    </div>
-                ))}
-                {isTyping && (
-                    <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                        <div style={{ padding: '10px 14px', borderRadius: '14px 14px 14px 4px', background: 'var(--bg-0)', border: '1px solid var(--border)' }}>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                                {[0, 1, 2].map(i => (
-                                    <span key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)', animation: `bounce 0.8s ease-in-out ${i * 0.15}s infinite` }} />
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-                <div ref={bottomRef} />
+            <div style={{ fontSize: '10px', color: 'var(--text-2)' }}>
+              {selComp ? `Focused on: ${selComp.name}` : 'Analyzing all components'}
             </div>
-
-            {/* Suggestion chips */}
-            <div style={{ padding: '6px 14px', display: 'flex', gap: '6px', flexWrap: 'wrap', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-                {suggestions.map(s => (
-                    <button
-                        key={s}
-                        onClick={() => { setInput(s); setTimeout(handleSend, 50); }}
-                        style={{
-                            padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 500,
-                            background: 'rgba(99,149,255,0.08)', border: '1px solid rgba(99,149,255,0.2)',
-                            color: 'var(--accent)', cursor: 'pointer', transition: 'all 0.15s',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,149,255,0.16)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(99,149,255,0.08)'}
-                    >
-                        {s}
-                    </button>
-                ))}
-            </div>
-
-            {/* Input */}
-            <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', flexShrink: 0 }}>
-                <textarea
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={handleKey}
-                    placeholder="Ask about your KPIs, alerts, recommendations..."
-                    rows={2}
-                    style={{
-                        flex: 1, background: 'var(--bg-0)', border: '1px solid var(--border)', borderRadius: '10px',
-                        padding: '8px 12px', color: 'var(--text-0)', fontSize: '12px', resize: 'none', outline: 'none',
-                        fontFamily: 'inherit',
-                    }}
-                />
-                <button
-                    onClick={handleSend}
-                    disabled={!input.trim()}
-                    style={{
-                        width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0, alignSelf: 'flex-end',
-                        background: input.trim() ? 'linear-gradient(135deg,#6395ff,#8b5cf6)' : 'var(--bg-0)',
-                        border: '1px solid var(--border)', cursor: input.trim() ? 'pointer' : 'not-allowed',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px',
-                        transition: 'all 0.15s',
-                    }}
-                >
-                    ➤
-                </button>
-            </div>
-
-            <style>{`
-        @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-      `}</style>
+          </div>
+          {/* KPI badge row */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {[['#10d98d', okCount, 'OK'], ['#f59e0b', warnCount, '⚠'], ['#ef4444', critCount, '🚨']].map(([c, n, l]) => (
+              <div key={l} style={{ padding: '2px 6px', borderRadius: '5px', background: `${c}18`, border: `1px solid ${c}30`, textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: c, lineHeight: 1 }}>{n}</div>
+                <div style={{ fontSize: '8px', color: 'var(--text-2)' }}>{l}</div>
+              </div>
+            ))}
+          </div>
         </div>
-    );
+
+        {/* Time range selector */}
+        <div style={{ display: 'flex', gap: '3px', marginTop: '8px', background: 'var(--bg-0)', borderRadius: '7px', padding: '2px' }}>
+          {['1h','6h','24h','7d','30d'].map(t => (
+            <button key={t} onClick={() => setTimeRange(t)} style={{ flex: 1, padding: '3px', borderRadius: '5px', border: 'none', fontSize: '10px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: timeRange === t ? 'var(--accent)' : 'transparent', color: timeRange === t ? '#fff' : 'var(--text-2)' }}>{t}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {messages.map(msg => (
+          <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+            <div style={{
+              maxWidth: '96%', padding: '9px 13px',
+              borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+              background: msg.role === 'user' ? 'linear-gradient(135deg,#6395ff,#8b5cf6)' : 'var(--bg-0)',
+              border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
+              fontSize: '12px', lineHeight: 1.6, color: msg.role === 'user' ? '#fff' : 'var(--text-1)',
+              whiteSpace: 'pre-wrap',
+            }}>
+              {formatMsg(msg.text)}
+            </div>
+
+            {/* Dynamic chart from backend */}
+            {msg.chart && msg.chart.data?.length > 0 && (
+              <div style={{ width: '98%', marginTop: '6px', padding: '12px', background: 'var(--bg-0)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                <DynamicChart config={msg.chart} height={180} />
+              </div>
+            )}
+          </div>
+        ))}
+
+        {isTyping && (
+          <div style={{ display: 'flex' }}>
+            <div style={{ padding: '10px 14px', borderRadius: '14px 14px 14px 4px', background: 'var(--bg-0)', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-2)', marginRight: '4px' }}>🦙 Llama thinking</span>
+                {[0,1,2].map(i => <span key={i} style={{ width:'6px', height:'6px', borderRadius:'50%', background:'var(--accent)', animation:`bounce 0.8s ease-in-out ${i*0.15}s infinite` }} />)}
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Suggestion chips */}
+      <div style={{ padding: '6px 12px', display: 'flex', gap: '5px', flexWrap: 'wrap', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+        {displaySuggestions.slice(0, 4).map(s => (
+          <button key={s} onClick={() => handleSend(s)} style={{ padding: '3px 9px', borderRadius: '16px', fontSize: '10px', fontWeight: 500, background: 'rgba(99,149,255,0.08)', border: '1px solid rgba(99,149,255,0.2)', color: 'var(--accent)', cursor: 'pointer', transition: 'all 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.background='rgba(99,149,255,0.18)'}
+            onMouseLeave={e => e.currentTarget.style.background='rgba(99,149,255,0.08)'}>
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Input */}
+      <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', flexShrink: 0 }}>
+        <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey}
+          placeholder={backendOnline ? 'Ask about KPIs — Llama will analyze & chart…' : 'Ask about your KPIs…'}
+          rows={2} style={{ flex: 1, background: 'var(--bg-0)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 10px', color: 'var(--text-0)', fontSize: '12px', resize: 'none', outline: 'none', fontFamily: 'inherit' }} />
+        <button onClick={() => handleSend()} disabled={!input.trim()}
+          style={{ width: '38px', height: '38px', borderRadius: '9px', flexShrink: 0, alignSelf: 'flex-end', background: input.trim() ? 'linear-gradient(135deg,#6395ff,#8b5cf6)' : 'var(--bg-0)', border: '1px solid var(--border)', cursor: input.trim() ? 'pointer' : 'not-allowed', fontSize: '15px', transition: 'all 0.15s' }}>
+          ➤
+        </button>
+      </div>
+      <style>{`@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}`}</style>
+    </div>
+  );
 }
 
-function formatMessage(text) {
-    // Bold ** marks
-    const parts = text.split(/(\*\*[^*]+\*\*)/g);
-    return parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**'))
-            return <strong key={i} style={{ color: 'inherit', fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
-        return part;
-    });
+function formatMsg(text) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={i} style={{ fontWeight: 700 }}>{part.slice(2,-2)}</strong>
+      : part
+  );
+}
+
+function buildLocalAnswer(q, kpis, components, selComp) {
+  const ql = q.toLowerCase();
+  if (!kpis.length) return 'No KPI data loaded yet. Import data via the KPIs panel or run the demo first.';
+  const crit = kpis.filter(k => k.status === 'red');
+  const warn = kpis.filter(k => k.status === 'orange');
+  if (ql.includes('status') || ql.includes('statut') || ql.includes('overview')) {
+    return `**System Overview**\n🟢 ${kpis.filter(k=>k.status==='green').length} OK · 🟡 ${warn.length} Warning · 🔴 ${crit.length} Critical\n\n${kpis.map(k=>`• **${k.name}**: ${typeof k.value==='number'?k.value.toFixed(1):k.value} ${k.unit} (${k.status.toUpperCase()})`).join('\n')}`;
+  }
+  if (ql.includes('anomal') || ql.includes('alert') || ql.includes('critical')) {
+    return crit.length ? `**${crit.length} critical alert(s):**\n${crit.map(k=>`🚨 ${k.name}: ${k.value.toFixed?k.value.toFixed(1):k.value} ${k.unit}`).join('\n')}` : '✅ No critical anomalies detected.';
+  }
+  const targets = selComp ? kpis.filter(k => selComp.kpiIds?.includes(k.id)) : kpis;
+  return `**KPI Summary${selComp ? ` for ${selComp.name}` : ''}**\n${targets.slice(0,4).map(k=>`• ${k.name}: **${typeof k.value==='number'?k.value.toFixed(1):k.value} ${k.unit}** — ${k.status}`).join('\n')}`;
 }
