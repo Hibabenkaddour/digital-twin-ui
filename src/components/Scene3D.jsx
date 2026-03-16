@@ -448,9 +448,154 @@ function ShapeSorter({ w, d, h, color }) {
     );
 }
 
+// ─── Custom AI-Generated Shape Renderer ───────────────────────────────────────
+// Renders dynamically based on the `mesh3D` descriptor returned by the LLM.
+function ShapeCustom({ w, d, h, color, mesh3D }) {
+    const m = mesh3D || { shape: 'box', scaleX: 1, scaleY: 1, scaleZ: 1 };
+    const sx = m.scaleX ?? 1;
+    const sy = m.scaleY ?? 1;
+    const sz = m.scaleZ ?? 1;
+    const mat = <meshStandardMaterial color={color} roughness={0.3} metalness={0.5} emissive={color} emissiveIntensity={0.08} />;
+    const glow = <meshStandardMaterial color={color} roughness={0.15} metalness={0.8} emissive={color} emissiveIntensity={0.25} transparent opacity={0.35} />;
+
+    switch (m.shape) {
+        case 'cylinder':
+            return (
+                <group>
+                    <mesh position={[0, h * 0.5 * sy, 0]} castShadow>
+                        <cylinderGeometry args={[w * 0.38 * sx, w * 0.42 * sx, h * sy, 24]} />
+                        {mat}
+                    </mesh>
+                    {/* Rim ring */}
+                    <mesh position={[0, h * sy * 0.96, 0]} castShadow>
+                        <torusGeometry args={[w * 0.39 * sx, 0.12, 8, 24]} />
+                        {glow}
+                    </mesh>
+                </group>
+            );
+
+        case 'sphere':
+            return (
+                <group>
+                    {/* Base platform */}
+                    <mesh position={[0, h * 0.08, 0]} castShadow>
+                        <cylinderGeometry args={[w * 0.3 * sx, w * 0.35 * sx, h * 0.16, 16]} />
+                        <meshStandardMaterial color="#374151" roughness={0.5} metalness={0.4} />
+                    </mesh>
+                    {/* Dome */}
+                    <mesh position={[0, h * 0.45 * sy, 0]} castShadow>
+                        <sphereGeometry args={[Math.min(w, d) * 0.38 * sx, 32, 32]} />
+                        {mat}
+                    </mesh>
+                    {/* Glow halo */}
+                    <mesh position={[0, h * 0.45 * sy, 0]}>
+                        <sphereGeometry args={[Math.min(w, d) * 0.40 * sx, 16, 16]} />
+                        {glow}
+                    </mesh>
+                </group>
+            );
+
+        case 'tower':
+            return (
+                <group>
+                    {/* Base */}
+                    <mesh position={[0, h * 0.1, 0]} castShadow>
+                        <boxGeometry args={[w * 0.55 * sx, h * 0.2, d * 0.55 * sz]} />
+                        <meshStandardMaterial color="#374151" roughness={0.5} metalness={0.4} />
+                    </mesh>
+                    {/* Shaft */}
+                    <mesh position={[0, h * 0.65 * sy, 0]} castShadow>
+                        <cylinderGeometry args={[w * 0.15 * sx, w * 0.2 * sx, h * 1.1 * sy, 10]} />
+                        {mat}
+                    </mesh>
+                    {/* Cab */}
+                    <mesh position={[0, h * 1.28 * sy, 0]} castShadow>
+                        <boxGeometry args={[w * 0.42 * sx, h * 0.22, d * 0.42 * sz]} />
+                        {mat}
+                    </mesh>
+                    {/* Antenna */}
+                    <mesh position={[0, h * 1.48 * sy, 0]} castShadow>
+                        <cylinderGeometry args={[0.06, 0.06, h * 0.3, 6]} />
+                        <meshStandardMaterial color="#9ca3af" roughness={0.3} metalness={0.8} />
+                    </mesh>
+                    {/* Beacon */}
+                    <mesh position={[0, h * 1.65 * sy, 0]}>
+                        <sphereGeometry args={[0.18, 8, 8]} />
+                        <meshStandardMaterial color="#f97316" emissive="#f97316" emissiveIntensity={1.2} />
+                    </mesh>
+                </group>
+            );
+
+        case 'flat':
+            return (
+                <group>
+                    {/* Flat slab */}
+                    <mesh position={[0, h * 0.06, 0]} castShadow>
+                        <boxGeometry args={[w * 0.97 * sx, h * 0.12, d * 0.97 * sz]} />
+                        {mat}
+                    </mesh>
+                    {/* Edge strip lights */}
+                    {[[-0.48, 0], [0.48, 0], [0, -0.48], [0, 0.48]].map(([ex, ez], i) => (
+                        <mesh key={i} position={[ex * w * sx, h * 0.13, ez * d * sz]}>
+                            <boxGeometry args={[ex !== 0 ? 0.12 : w * sx, 0.08, ez !== 0 ? 0.12 : d * sz]} />
+                            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} />
+                        </mesh>
+                    ))}
+                </group>
+            );
+
+        case 'L':
+            return (
+                <group>
+                    {/* Horizontal arm */}
+                    <mesh position={[-w * 0.22 * sx, h * 0.4, 0]} castShadow>
+                        <boxGeometry args={[w * 0.55 * sx, h * 0.8, d * 0.45 * sz]} />
+                        {mat}
+                    </mesh>
+                    {/* Vertical arm */}
+                    <mesh position={[w * 0.22 * sx, h * 0.4, d * 0.26 * sz]} castShadow>
+                        <boxGeometry args={[w * 0.45 * sx, h * 0.8, d * 0.45 * sz]} />
+                        {mat}
+                    </mesh>
+                    {/* Corner detail */}
+                    <mesh position={[0, h * 0.85, 0]}>
+                        <sphereGeometry args={[0.22, 8, 8]} />
+                        {glow}
+                    </mesh>
+                </group>
+            );
+
+        case 'box':
+        default:
+            return (
+                <group>
+                    {/* Main body */}
+                    <mesh position={[0, h * 0.45 * sy, 0]} castShadow>
+                        <boxGeometry args={[w * 0.88 * sx, h * 0.9 * sy, d * 0.88 * sz]} />
+                        {mat}
+                    </mesh>
+                    {/* Roof detail */}
+                    <mesh position={[0, h * 0.93 * sy, 0]} castShadow>
+                        <boxGeometry args={[w * 0.94 * sx, h * 0.08, d * 0.94 * sz]} />
+                        {glow}
+                    </mesh>
+                    {/* Front accent */}
+                    <mesh position={[0, h * 0.42 * sy, d * 0.45 * sz]}>
+                        <boxGeometry args={[w * 0.4 * sx, h * 0.5 * sy, 0.12]} />
+                        <meshStandardMaterial color="#6ab4f5" roughness={0.05} metalness={0.9} transparent opacity={0.6} />
+                    </mesh>
+                </group>
+            );
+    }
+}
+
 // ─── Shape Dispatcher ─────────────────────────────────────────────────────────
-function DomainShape({ type, w, d, h, color }) {
+function DomainShape({ type, w, d, h, color, mesh3D }) {
     const props = { w, d, h, color };
+    // Custom AI-generated components — type starts with "custom_"
+    if (type?.startsWith('custom_')) {
+        return <ShapeCustom {...props} mesh3D={mesh3D} />;
+    }
     switch (type) {
         case 'terminal': return <ShapeTerminal {...props} />;
         case 'gate': return <ShapeGate {...props} />;
@@ -572,7 +717,7 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
             </mesh>
 
             {/* Domain-specific shape */}
-            <DomainShape type={component.type} w={w} d={d} h={h} color={statusColor} />
+            <DomainShape type={component.type} w={w} d={d} h={h} color={statusColor} mesh3D={component.mesh3D} />
 
             {/* Selection glow */}
             {selected && (
@@ -590,10 +735,16 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
                 </mesh>
             )}
 
-            {/* Component label */}
+            {/* Component label + custom badge */}
             <Text position={[0, h + 1.0, 0]} fontSize={0.75} color={selected ? '#6395ff' : '#94a3c8'} anchorX="center" anchorY="bottom" maxWidth={w}>
-                {component.name}
+                {component.isCustom ? `${component.icon || '✨'} ${component.name}` : component.name}
             </Text>
+            {/* Custom component sub-label */}
+            {component.isCustom && (
+                <Text position={[0, h + 0.2, 0]} fontSize={0.45} color="#a855f7" anchorX="center" anchorY="bottom" maxWidth={w}>
+                    AI Generated
+                </Text>
+            )}
 
             {/* KPI value */}
             {kpi && (

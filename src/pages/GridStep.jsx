@@ -48,26 +48,43 @@ export default function GridStep() {
 
     try {
       const result = await layoutPrompt(aiPrompt, currentState);
-      // Apply new state to Zustand store
       const store = useTwinStore.getState();
+      let customCount = 0;
+
       result.newState.components.forEach(comp => {
         const existing = components.find(c => c.id === comp.id);
         if (!existing) {
-          store.addComponent(comp.type, { row: comp.row, col: comp.col, name: comp.name, color: comp.color, gridSize: comp.gridSize });
+          // Pass ALL extra fields for custom components
+          store.addComponent(comp.type, {
+            row: comp.row, col: comp.col,
+            name: comp.name, color: comp.color,
+            gridSize: comp.gridSize,
+            isCustom: comp.isCustom || false,
+            icon: comp.icon || '',
+            description: comp.description || '',
+            mesh3D: comp.mesh3D || null,
+          });
+          if (comp.isCustom) customCount++;
         } else if (existing.row !== comp.row || existing.col !== comp.col) {
           store.moveComponent(comp.id, comp.col, comp.row);
         }
       });
+
       // Remove deleted components
       components.forEach(c => {
         if (!result.newState.components.find(nc => nc.id === c.id)) {
           useTwinStore.getState().removeComponent?.(c.id);
         }
       });
-      setAiResult({ explanation: result.explanation, actionsCount: result.actions.length });
+
+      setAiResult({
+        explanation: result.explanation,
+        actionsCount: result.actions.length,
+        customCount,
+      });
       setAiPrompt('');
     } catch (e) {
-      // Fallback: basic local parsing
+      // Fallback: basic local parsing for palette types only
       const p = aiPrompt.toLowerCase();
       blueprints.forEach(bp => {
         if (p.includes(bp.type.replace('_', ' ')) || p.includes(bp.name.toLowerCase())) {
@@ -139,10 +156,12 @@ export default function GridStep() {
               {/* Quick example prompts */}
               <div style={{ display: 'flex', gap: '5px', marginTop: '5px', flexWrap: 'wrap' }}>
                 {[
-                  'Add 2 conveyor belts',
-                  'Remove the last component',
-                  'Connect all components in sequence',
-                  'Add a quality control station',
+                  `Add a fuel tank 3x2`,
+                  `Add a radar dome`,
+                  `Add a control tower 2x3`,
+                  `Add a VIP lounge 4x2`,
+                  `Add a solar panel array 3x1`,
+                  `Connect all components in sequence`,
                 ].map(ex => (
                   <button key={ex} onClick={() => setAiPrompt(ex)}
                     style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(99,149,255,0.07)', border: '1px solid rgba(99,149,255,0.15)', color: 'var(--text-2)', cursor: 'pointer' }}>
@@ -157,12 +176,17 @@ export default function GridStep() {
             </button>
           </div>
           {aiResult && (
-            <div style={{ marginTop: '6px', padding: '6px 10px', borderRadius: '7px', fontSize: '11px',
+            <div style={{ marginTop: '6px', padding: '7px 12px', borderRadius: '7px', fontSize: '11px',
               background: aiResult.error ? 'rgba(245,158,11,0.08)' : 'rgba(16,217,141,0.08)',
               border: `1px solid ${aiResult.error ? 'rgba(245,158,11,0.25)' : 'rgba(16,217,141,0.25)'}`,
               color: aiResult.error ? '#f59e0b' : '#10d98d' }}>
               {aiResult.error ? '⚠' : '✅'} {aiResult.explanation}
-              {aiResult.actionsCount > 0 && ` (${aiResult.actionsCount} actions applied)`}
+              {aiResult.actionsCount > 0 && ` (${aiResult.actionsCount} action${aiResult.actionsCount > 1 ? 's' : ''} applied)`}
+              {aiResult.customCount > 0 && (
+                <span style={{ marginLeft: '8px', padding: '1px 6px', borderRadius: '8px', background: 'rgba(168,85,247,0.2)', color: '#a855f7', fontSize: '10px', fontWeight: 700 }}>
+                  ✨ {aiResult.customCount} custom 3D component{aiResult.customCount > 1 ? 's' : ''} generated
+                </span>
+              )}
             </div>
           )}
         </div>

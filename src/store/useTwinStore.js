@@ -227,6 +227,11 @@ const useTwinStore = create((set, get) => ({
                 col: overrides.col,
                 row: overrides.row,
                 kpiIds: [],
+                // Custom AI-generated component metadata
+                isCustom: overrides.isCustom || false,
+                icon: overrides.icon || '',
+                description: overrides.description || '',
+                mesh3D: overrides.mesh3D || null,
             };
             set(s => ({ components: [...s.components, newComp] }));
             return;
