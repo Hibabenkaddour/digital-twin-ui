@@ -180,7 +180,7 @@ const useTwinStore = create((set, get) => ({
     activePanel: 'kpi',  // 'kpi' | 'charts' | 'chat'
 
     chatMessages: [
-        { id: 0, role: 'assistant', text: '👋 Hello! I\'m your Digital Twin AI assistant. Ask me anything about your KPIs, alerts, or system performance.' }
+        { id: 0, role: 'assistant', text: '👋 Hello! I\'m your Analytics AI powered by Llama 3.\n\nConnect your data source first (🔌 Source tab), then ask me anything about your KPIs.' }
     ],
 
     setStep: (step) => set({ currentStep: step }),
@@ -199,10 +199,9 @@ const useTwinStore = create((set, get) => ({
     initScene: () => {
         const { selectedDomain, gridCols, gridRows } = get();
         const components = generateComponents(selectedDomain, gridCols, gridRows);
-        const kpis = generateKpis(selectedDomain);
-        components.forEach((c, i) => { c.kpiIds = [kpis[i % kpis.length]?.id].filter(Boolean); });
-        const kpiHistory = generateHistory(kpis);
-        set({ components, connections: generateConnections(components), kpis, kpiHistory });
+        // Start with empty KPIs — real data comes from file source via WebSocket
+        const kpiHistory = [];
+        set({ components, connections: generateConnections(components), kpis: [], kpiHistory });
     },
 
     addComponent: (type, overrides = {}) => {
@@ -296,6 +295,70 @@ const useTwinStore = create((set, get) => ({
             return { kpis: newKpis, kpiHistory: newHistory };
         });
     },
+
+    // Called by the WebSocket hook for each real-time reading from the backend
+    updateKpiFromWS: (reading) => {
+        // reading shape: { componentId, kpiName, value, unit, status, source, meta? }
+        set(s => {
+            const kpiId = `ws_${reading.componentId}_${reading.kpiName}`
+                .replace(/\s+/g, '_').replace(/[^a-z0-9_]/gi, '').toLowerCase();
+
+            const exists = s.kpis.find(k => k.id === kpiId);
+            let newKpis;
+            let newComponents = s.components;
+
+            if (exists) {
+                // Update existing KPI value + status
+                newKpis = s.kpis.map(k =>
+                    k.id === kpiId
+                        ? {
+                            ...k,
+                            value: reading.value,
+                            status: reading.status || 'green',
+                            unit: reading.unit || k.unit,
+                          }
+                        : k
+                );
+            } else {
+                // First reading for this KPI — register it
+                // Parse rules from the reading meta (set during column assignment)
+                const rules = reading.meta?.rules || {};
+                const newKpi = {
+                    id: kpiId,
+                    name: reading.kpiName,
+                    value: reading.value,
+                    unit: reading.unit || '',
+                    status: reading.status || 'green',
+                    source: reading.source || 'realtime',
+                    rules: {
+                        green:  rules.green  || [0, rules.orange?.[0] || 999],
+                        orange: rules.orange || null,
+                        red:    rules.red    || null,
+                    },
+                };
+                newKpis = [...s.kpis, newKpi];
+
+                // Link KPI to its component
+                const comp = s.components.find(c => c.id === reading.componentId);
+                if (comp && !comp.kpiIds?.includes(kpiId)) {
+                    newComponents = s.components.map(c =>
+                        c.id === reading.componentId
+                            ? { ...c, kpiIds: [...(c.kpiIds || []), kpiId] }
+                            : c
+                    );
+                }
+            }
+
+            // Always update history — add one time-point with ALL current kpi values
+            const newPoint = { time: new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) };
+            newKpis.forEach(k => { newPoint[k.id] = typeof k.value === 'number' ? +k.value.toFixed(2) : k.value; });
+            const newHistory = [...s.kpiHistory.slice(-59), newPoint];
+
+            return { kpis: newKpis, kpiHistory: newHistory, components: newComponents };
+        });
+    },
+
+
 
     sendMessage: (text) => {
         const msgId = Date.now();

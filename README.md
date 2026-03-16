@@ -1,72 +1,247 @@
-# 🏭 Digital Twin Platform — DXC Intelligent Analytics
+# ⬡ Digital Twin Platform — DXC Intelligent Analytics
 
-A **React + Three.js** frontend for a **3D Agnostic Digital Twin** platform, built as a visual interactive demo for factory, airport, and warehouse environments.
+> **Real-Time Industrial Digital Twin** — Airport · Factory · Warehouse  
+> Full-stack platform with 3D visualization, live KPI streaming, and AI analytics.
+
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev)
+[![Three.js](https://img.shields.io/badge/Three.js-0.183-black?logo=three.js)](https://threejs.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![LangChain](https://img.shields.io/badge/LangChain-0.3-1C3C3C)](https://langchain.com)
+[![Ollama](https://img.shields.io/badge/LLM-Llama%203.2%20local-8A2BE2)](https://ollama.com)
+[![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite)](https://sqlite.org)
+
+---
+
+## 🎯 What It Does
+
+A **5-step wizard** that builds and then monitors your digital twin in real-time:
+
+| Step | Page | What happens |
+|------|------|-------------|
+| 1️⃣ | **Configure** | Name your twin, pick domain (airport / factory / warehouse), set dimensions |
+| 2️⃣ | **Layout** | Drag-and-drop components onto a 2D/3D grid |
+| 3️⃣ | **Connections** | Define flow paths — passenger flow, material flow, goods movement |
+| 4️⃣ | **KPI Setup** | Upload one CSV/Excel → assign each column to a component with thresholds |
+| 5️⃣ | **Live View** | 3D scene updates in real-time + charts + AI chatbot |
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Browser (React + Vite)                 │
+│  Scene3D (Three.js)  │  KpiCharts (Recharts)  │ Chatbot │
+│─────────────────────────────────────────────────────────│
+│  Zustand Store  ←  useKpiWebSocket (auto-reconnect)     │
+└─────────────────────┬───────────────────────────────────┘
+                      │  WebSocket /ws/kpis
+┌─────────────────────▼───────────────────────────────────┐
+│                FastAPI Backend (Python)                  │
+│  /source/upload → FileConnector → KPI_BUS (asyncio Q)  │
+│  /ws/kpis broadcaster → streams to all WS clients      │
+│  /analytics → LangChain NLQ + chart agents             │
+│  /layout    → LangGraph layout-editing agent           │
+│─────────────────────────────────────────────────────────│
+│  SQLite (SQLAlchemy)  │  Pandas  │  Ollama Llama 3.2   │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
 
 ## ✨ Features
 
-- **Interactive 3D Scene** (React Three Fiber) with domain-specific shapes per component type
-- **Drag-to-move** components in 2D grid and 3D view (Ctrl+drag)
-- **Add components** via toolbar buttons — any blueprint type, any time
-- **Live KPI monitoring** with real-time updates every 3 seconds
-- **KPI Charts** — area charts with threshold overlays per KPI (Recharts)
-- **Analytics AI Chatbot** — ask natural language questions about your KPIs
-- **Step-by-step wizard**: Configure → Layout → Connections → KPIs → Live View
-- **3 domains**: Factory 🏭 · Airport ✈️ · Warehouse 📦
-- **Multiple camera views**: Isometric, Top-Down, Free
+### 3D Digital Twin
+- Interactive **Three.js** scene with domain-specific 3D shapes per component type
+- Animated **connection tubes** colored by status (Fluid 🟢 / Congested 🟠 / Bottleneck 🔴)
+- Camera views: **Isometric**, **Top**, **Front**, **Free** (orbit)
+- Click a component → instantly see its KPI charts
 
-## 🚀 Tech Stack
+### Real-Time Data Pipeline
+- Upload **one CSV or Excel file** containing all KPI columns
+- **Column assignment UI**: map each column → component + label + unit + thresholds
+- **File connector** replays data rows continuously as a live stream
+- **WebSocket streaming** — backend pushes updates to all connected browsers
+- Optional: **MQTT** connector for real IoT sensors, **REST** connector for external APIs
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | React 18 + Vite |
-| 3D Engine | React Three Fiber + Drei + Three.js |
-| State | Zustand |
-| Charts | Recharts |
-| Animations | Framer Motion |
-| Icons | Lucide React |
-| Fonts | Inter (fontsource) |
+### KPI Monitoring
+- Live value cards with status coloring (green / orange / red)
+- Threshold **reference lines** on charts
+- **Area, Line, Bar** chart type switcher
+- Per-component filtering — click any component to see only its KPIs
+- Alert bell showing critical KPI count
 
-## 🛠️ Getting Started
+### AI Analytics (Llama 3 via Ollama — runs locally, no cloud)
+- **NLQ Chatbot**: ask questions like *"What is the average security wait time?"*
+- **Chart agent**: generates dynamic charts from prompts
+- **Layout agent**: *"Add a security zone between Gate 2 and Terminal 1"*
+- Falls back gracefully if Ollama is not running
+
+### Multi-Domain Support
+| Domain | Sample Components |
+|--------|-----------------|
+| ✈️ Airport | Terminal, Gate, Runway, Check-In Desk, Security Zone |
+| 🏭 Factory | Assembly Line, Press, CNC Machine, Quality Control, Storage |
+| 📦 Warehouse | Receiving Dock, Rack, Sorting Belt, Dispatch |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Python 3.11+**
+- **Node.js 20+**
+- **[Ollama](https://ollama.com)** (for AI features): `ollama pull llama3.2`
+
+### 1. Clone
 
 ```bash
-# Install dependencies
+git clone https://github.com/Hibabenkaddour/digital-twin-ui.git
+cd digital-twin-ui
+```
+
+### 2. Backend
+
+```bash
+cd digital-twin-backend
+
+# Create virtual environment
+python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Linux / Mac
+
+pip install -r requirements.txt
+
+# Configure (copy and edit)
+copy .env.example .env
+
+# Start backend
+python main.py
+# ✅ API: http://localhost:8000
+# ✅ Docs: http://localhost:8000/docs
+```
+
+### 3. Frontend
+
+```bash
+# In a new terminal, from the repo root
 npm install
-
-# Start dev server
 npm run dev
-
-# Build for production
-npm run build
+# ✅ App: http://localhost:5173
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+### 4. Sample Data
 
-## 📁 Project Structure
+Ready-to-use CSV files are in `digital-twin-backend/sample_data/`:
+
+| File | Domain | Columns |
+|---|---|---|
+| `airport_data.csv` | Airport | passenger_flow · security_wait · gate_util · baggage_delay · checkin_queue · runway_movements |
+| `factory_data.csv` | Factory | machine_temp · throughput · pressure · quality_rate · downtime · belt_speed |
+| `warehouse_data.csv` | Warehouse | pick_rate · rack_fill · dock_util · cycle_time · conveyor · error_rate |
+
+---
+
+## ⚙️ Environment Variables
+
+Copy `digital-twin-backend/.env.example` → `.env` and configure:
+
+```env
+# LLM (local — no API key needed with Ollama)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+OPENAI_API_KEY=           # Optional: override with GPT-4o
+
+# Optional connectors
+MQTT_ENABLED=false
+MQTT_BROKER=localhost
+MQTT_PORT=1883
+REST_ENABLED=false
+
+# App
+DEFAULT_DOMAIN=airport    # airport | factory | warehouse
+FRONTEND_URL=http://localhost:5173
+```
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+| Layer | Technology |
+|---|---|
+| Framework | **React 19** + Vite 7 |
+| 3D Engine | **Three.js** + @react-three/fiber + @react-three/drei |
+| Charts | **Recharts** (Area, Line, Bar, Pie, Radar) |
+| State | **Zustand** |
+| Animations | **Framer Motion** |
+| Icons | Lucide React |
+| Font | Inter (fontsource) |
+| Styling | Vanilla CSS — dark mode, glassmorphism |
+| Real-time | Native WebSocket API |
+
+### Backend
+| Layer | Technology |
+|---|---|
+| Framework | **FastAPI** 0.115 + Uvicorn |
+| Database | **SQLite** via SQLAlchemy 2.0 + aiosqlite |
+| Data | **Pandas** 2.2 + openpyxl |
+| AI/LLM | **LangChain** 0.3 + **LangGraph** 0.2 |
+| Local LLM | **Ollama** (Llama 3.2) |
+| HTTP | httpx (async REST polling) |
+| Validation | Pydantic 2.10 |
+
+See [`TECH_STACK.md`](./TECH_STACK.md) for the full detailed breakdown.
+
+---
+
+## 📂 Project Structure
 
 ```
-src/
-├── store/
-│   └── useTwinStore.js      # Zustand global state + AI responses
-├── components/
-│   ├── Scene3D.jsx           # 3D scene with domain-specific shapes
-│   ├── Grid2D.jsx            # 2D grid editor with drag-to-move
-│   ├── KpiPanel.jsx          # Live KPI sidebar
-│   ├── KpiCharts.jsx         # Recharts KPI visualization
-│   ├── Chatbot.jsx           # Analytics AI chatbot
-│   └── Navbar.jsx            # Top navigation + wizard breadcrumb
-└── pages/
-    ├── HomePage.jsx          # Landing page with domain selection
-    ├── FormStep.jsx          # Twin configuration form
-    ├── GridStep.jsx          # Layout editor (2D + 3D split)
-    ├── ConnectionsStep.jsx   # Connection visualization
-    ├── KpiStep.jsx           # KPI & data adapter config
-    └── TwinView.jsx          # Live twin dashboard
+digital-twin-ui/           ← this repo
+│
+├── src/                   ← React frontend
+│   ├── pages/
+│   │   ├── FormStep.jsx           # Step 1: Configure
+│   │   ├── GridStep.jsx           # Step 2: Layout
+│   │   ├── ConnectionsStep.jsx    # Step 3: Connections
+│   │   ├── KpiStep.jsx            # Step 4: Data source setup ← NEW
+│   │   └── TwinView.jsx           # Step 5: Live dashboard
+│   ├── components/
+│   │   ├── Scene3D.jsx            # Three.js 3D scene
+│   │   ├── KpiPanel.jsx           # Live KPI value cards
+│   │   ├── KpiCharts.jsx          # Interactive charts
+│   │   └── Chatbot.jsx            # NLQ AI chatbot
+│   ├── hooks/
+│   │   └── useKpiWebSocket.js     # WS hook + auto-reconnect
+│   ├── store/
+│   │   └── useTwinStore.js        # Zustand global state
+│   └── services/
+│       └── api.js                 # REST API client
+│
+└── digital-twin-backend/  ← FastAPI Python backend
+    ├── main.py
+    ├── requirements.txt
+    ├── .env.example
+    ├── routers/
+    │   ├── layout.py              # LLM layout editing
+    │   ├── kpis.py                # KPI history
+    │   ├── analytics.py           # NLQ + charts
+    │   ├── stream.py              # WebSocket /ws/kpis
+    │   └── data_source.py         # Upload + assign
+    ├── connectors/
+    │   ├── file_connector.py      # Primary: CSV streaming
+    │   ├── mqtt_connector.py      # IoT optional
+    │   └── rest_connector.py      # REST optional
+    ├── services/
+    │   ├── llm_service.py         # Ollama / OpenAI
+    │   └── data_service.py        # Pandas helpers
+    ├── db/                        # SQLAlchemy + SQLite
+    └── sample_data/               # Ready-to-use CSV files
 ```
 
-## 🎨 Screenshots
-
-> Configure your domain → Design the layout → Monitor live KPIs → Chat with AI analytics
+---
 
 ## 📄 License
 
-MIT — DXC Technology Intelligent Analytics Group
+MIT — DXC Intelligent Analytics © 2026

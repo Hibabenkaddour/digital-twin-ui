@@ -10,7 +10,10 @@ export default defineConfig({
       '/kpis':      { target: 'http://localhost:8000', changeOrigin: true },
       '/analytics': { target: 'http://localhost:8000', changeOrigin: true },
       '/health':    { target: 'http://localhost:8000', changeOrigin: true },
+      '/source':    { target: 'http://localhost:8000', changeOrigin: true },
+      '/stream':    { target: 'http://localhost:8000', changeOrigin: true },
     },
+
   },
   define: {
     'import.meta.env.VITE_API_URL': JSON.stringify(''),  // use proxy (empty = relative URLs)

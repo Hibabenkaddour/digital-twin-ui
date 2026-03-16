@@ -1,0 +1,117 @@
+import json
+from datetime import datetime
+from sqlalchemy.orm import Session
+from db.database import LayoutStateDB, KpiDataDB, QueryHistoryDB
+from models.schemas import LayoutStateSchema, KpiRecord
+
+
+# ─── Layout CRUD ──────────────────────────────────────────────────────────────
+
+def get_layout(db: Session, layout_id: str = "default") -> LayoutStateDB | None:
+    return db.query(LayoutStateDB).filter(LayoutStateDB.id == layout_id).first()
+
+
+def save_layout(db: Session, state: LayoutStateSchema) -> LayoutStateDB:
+    existing = get_layout(db, state.id)
+    if existing:
+        existing.name = state.name
+        existing.domain = state.domain
+        existing.grid_cols = state.gridCols
+        existing.grid_rows = state.gridRows
+        existing.components_json = json.dumps([c.model_dump() for c in state.components])
+        existing.connections_json = json.dumps([c.model_dump() for c in state.connections])
+        existing.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(existing)
+        return existing
+    else:
+        db_layout = LayoutStateDB(
+            id=state.id,
+            name=state.name,
+            domain=state.domain,
+            grid_cols=state.gridCols,
+            grid_rows=state.gridRows,
+            components_json=json.dumps([c.model_dump() for c in state.components]),
+            connections_json=json.dumps([c.model_dump() for c in state.connections]),
+        )
+        db.add(db_layout)
+        db.commit()
+        db.refresh(db_layout)
+        return db_layout
+
+
+def layout_db_to_schema(db_layout: LayoutStateDB) -> LayoutStateSchema:
+    from models.schemas import ComponentSchema, ConnectionSchema
+    return LayoutStateSchema(
+        id=db_layout.id,
+        name=db_layout.name,
+        domain=db_layout.domain,
+        gridCols=db_layout.grid_cols,
+        gridRows=db_layout.grid_rows,
+        components=[ComponentSchema(**c) for c in json.loads(db_layout.components_json or "[]")],
+        connections=[ConnectionSchema(**c) for c in json.loads(db_layout.connections_json or "[]")],
+        updatedAt=db_layout.updated_at,
+    )
+
+
+# ─── KPI CRUD ─────────────────────────────────────────────────────────────────
+
+def insert_kpi_records(db: Session, component_id: str, kpi_name: str, records: list[dict]) -> int:
+    db_records = [
+        KpiDataDB(
+            component_id=component_id,
+            kpi_name=kpi_name,
+            value=float(r.get("value", 0)),
+            unit=str(r.get("unit", "")),
+            timestamp=r.get("timestamp", datetime.utcnow()),
+            source=r.get("source", "csv"),
+        )
+        for r in records
+    ]
+    db.bulk_save_objects(db_records)
+    db.commit()
+    return len(db_records)
+
+
+def get_kpi_data(db: Session, component_id: str | None = None, kpi_name: str | None = None, limit: int = 1000) -> list[KpiDataDB]:
+    q = db.query(KpiDataDB)
+    if component_id:
+        q = q.filter(KpiDataDB.component_id == component_id)
+    if kpi_name:
+        q = q.filter(KpiDataDB.kpi_name == kpi_name)
+    return q.order_by(KpiDataDB.timestamp.desc()).limit(limit).all()
+
+
+def get_all_kpi_summary(db: Session) -> list[dict]:
+    from sqlalchemy import func, text
+    result = db.execute(text("""
+        SELECT component_id, kpi_name, COUNT(*) as count,
+               MIN(value) as min_val, MAX(value) as max_val, AVG(value) as avg_val,
+               MAX(timestamp) as last_seen
+        FROM kpi_data
+        GROUP BY component_id, kpi_name
+    """)).fetchall()
+    return [dict(r._mapping) for r in result]
+
+
+def delete_kpi_data(db: Session, component_id: str):
+    db.query(KpiDataDB).filter(KpiDataDB.component_id == component_id).delete()
+    db.commit()
+
+
+# ─── Query History CRUD ───────────────────────────────────────────────────────
+
+def save_query(db: Session, question: str, answer: str, chart_config: dict | None) -> QueryHistoryDB:
+    record = QueryHistoryDB(
+        question=question,
+        answer=answer,
+        chart_config_json=json.dumps(chart_config) if chart_config else None,
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def get_query_history(db: Session, limit: int = 20) -> list[QueryHistoryDB]:
+    return db.query(QueryHistoryDB).order_by(QueryHistoryDB.created_at.desc()).limit(limit).all()

@@ -45,3 +45,17 @@ lerna-debug.log*
 *.DS_Store
 ehthumbs.db
 Desktop.ini
+
+# ── Python / Backend ─────────────────────────────────────────────────────────
+digital-twin-backend/__pycache__/
+digital-twin-backend/**/__pycache__/
+digital-twin-backend/*.pyc
+digital-twin-backend/venv/
+digital-twin-backend/.venv/
+digital-twin-backend/*.db
+digital-twin-backend/*.sqlite
+digital-twin-backend/*.sqlite3
+digital-twin-backend/source_data/
+digital-twin-backend/uploaded_files/
+digital-twin-backend/.env
+
