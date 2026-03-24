@@ -58,33 +58,25 @@ _connectors = []
 
 
 async def _start_connectors():
-    from connectors.file_connector import FileConnector
+    from connectors.postgres_connector import PostgresConnector
     from connectors.mqtt_connector import MqttConnector, MQTT_ENABLED
     from connectors.rest_connector import RestConnector, REST_ENABLED
-    from routers.data_source import UPLOADED_SOURCE, get_source_state
+    from routers.data_source import get_source_state
 
     state = get_source_state()
 
-    # File connector — primary source (real data from uploaded file)
+    # Postgres connector — primary source
     saved_assignments = state.get("assignments", {})
-    existing_file = UPLOADED_SOURCE if os.path.exists(UPLOADED_SOURCE) else None
+    domain = state.get("domain", "factory")
 
-    file_mode = os.getenv("FILE_CONNECTOR_MODE", "replay")  # replay | tail
-    replay_speed = float(os.getenv("REPLAY_SPEED", "2.0"))  # rows/sec
-
-    fc = FileConnector({
-        "file_path": existing_file,
+    pc = PostgresConnector({
         "assignments": saved_assignments,
-        "mode": file_mode,
-        "replay_speed": replay_speed,
-        "poll_interval": float(os.getenv("TAIL_POLL_INTERVAL", "2.0")),
+        "domain": domain,
+        "poll_interval": 2.0,
     })
-    _connectors.append(fc)
-    await fc.start()
-    if existing_file:
-        logger.info(f"📂 File connector started — source: {os.path.basename(existing_file)} ({file_mode} mode)")
-    else:
-        logger.info("📂 File connector started — waiting for source upload at POST /source/upload")
+    _connectors.append(pc)
+    await pc.start()
+    logger.info(f"🐘 Postgres connector started — polling domain '{domain}'")
 
     # MQTT (optional, for real IoT sensors)
     if MQTT_ENABLED:
@@ -132,24 +124,22 @@ async def shutdown():
 @app.get("/")
 def root():
     from services.llm_service import has_real_llm, USE_OLLAMA, OLLAMA_MODEL, OPENAI_MODEL
-    from connectors.file_connector import get_file_connector
-    fc = get_file_connector()
+    from connectors.postgres_connector import get_postgres_connector
+    pc = get_postgres_connector()
     return {
         "name": "Digital Twin Platform API",
-        "version": "2.1.0",
+        "version": "2.2.0-PG",
         "docs": "/docs",
         "llm_mode": "ollama" if (USE_OLLAMA and has_real_llm()) else ("openai" if has_real_llm() else "mock"),
         "model": OLLAMA_MODEL if USE_OLLAMA else OPENAI_MODEL,
         "ws_endpoint": "ws://localhost:8000/ws/kpis",
         "source_status": {
-            "connected": fc.file_path is not None if fc else False,
-            "mode": fc.mode if fc else None,
-            "assignments": len(fc.assignments) if fc else 0,
+            "domain": pc.domain if pc else None,
+            "assignments": len(pc.assignments) if pc else 0,
         },
         "endpoints": {
-            "upload_source":  "POST /source/upload",
+            "get_schema":     "GET  /source/schema",
             "assign_columns": "POST /source/assign",
-            "source_schema":  "GET  /source/schema",
             "layout_prompt":  "POST /layout/prompt",
             "nlq_query":      "POST /analytics/query",
             "ws_stream":      "WS   /ws/kpis",
@@ -159,11 +149,10 @@ def root():
 
 @app.get("/health")
 def health():
-    from connectors.file_connector import get_file_connector
-    fc = get_file_connector()
+    from connectors.postgres_connector import get_postgres_connector
+    pc = get_postgres_connector()
     return {
         "status": "ok",
-        "source_connected": fc.file_path is not None if fc else False,
         "ws_clients": manager.client_count,
         "connectors": [c.name for c in _connectors if c._running],
     }

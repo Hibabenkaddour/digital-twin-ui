@@ -31,6 +31,10 @@ class ConnectionManager:
         self._clients: set[WebSocket] = set()
         self._latest: dict[str, dict] = {}   # key = "component_id:kpi_name"
 
+    def clear_latest(self):
+        self._latest = {}
+        logger.info("WS snapshot cache cleared")
+
     async def connect(self, ws: WebSocket):
         await ws.accept()
         self._clients.add(ws)

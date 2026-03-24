@@ -82,10 +82,19 @@ class BaseConnector(ABC):
 
     def compute_status(self, value: float, rules: dict) -> str:
         """Compute green/orange/red from threshold rules dict."""
+        direction = rules.get("direction", "asc")
         red_lo = rules.get("red", [None, None])[0]
         orange_lo = rules.get("orange", [None, None])[0]
-        if red_lo is not None and value >= red_lo:
-            return "red"
-        if orange_lo is not None and value >= orange_lo:
-            return "orange"
+        
+        if direction == "desc":
+            if red_lo is not None and value <= red_lo:
+                return "red"
+            if orange_lo is not None and value <= orange_lo:
+                return "orange"
+        else:
+            if red_lo is not None and value >= red_lo:
+                return "red"
+            if orange_lo is not None and value >= orange_lo:
+                return "orange"
+                
         return "green"

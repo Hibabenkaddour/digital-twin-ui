@@ -1,14 +1,18 @@
 import { useState, Suspense } from 'react';
 import useTwinStore from '../store/useTwinStore';
 import Scene3D from '../components/Scene3D';
-import { ChevronRight, ArrowLeft, Link2, Zap, Wifi } from 'lucide-react';
+import Grid2D from '../components/Grid2D';
+import { ChevronRight, ArrowLeft, Link2, Zap, Wifi, Trash2 } from 'lucide-react';
+
+const VIEWS = ['2D Grid', '3D Preview'];
 
 const STATUS_COLORS = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
 const FLOW_LABELS = { green: 'Fluid', orange: 'Congested', red: 'Bottleneck' };
 
 export default function ConnectionsStep() {
-    const { setStep, components, connections, selectedDomain } = useTwinStore();
+    const { setStep, components, connections, selectedDomain, removeConnection } = useTwinStore();
     const [hoveredConn, setHoveredConn] = useState(null);
+    const [view, setView] = useState('2D Grid');
 
     const DOMAIN_LINK_TYPES = {
         factory: { label: 'Production Flow', desc: 'Parts pass from machine A to B', icon: '⚙️' },
@@ -78,6 +82,28 @@ export default function ConnectionsStep() {
                                                 <span className={`dot dot-${conn.flowStatus}`} />
                                                 {FLOW_LABELS[conn.flowStatus]}
                                             </span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeConnection(conn.id);
+                                                }}
+                                                style={{
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    color: 'var(--text-3)',
+                                                    cursor: 'pointer',
+                                                    padding: '4px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    borderRadius: '4px',
+                                                }}
+                                                onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+                                                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
+                                                title="Delete Connection"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -135,11 +161,22 @@ export default function ConnectionsStep() {
                     </div>
                 </div>
 
-                {/* Right — 3D view */}
-                <div style={{ flex: 1, position: 'relative' }}>
-                    <Suspense fallback={<div style={{ color: 'var(--text-2)', padding: '40px', textAlign: 'center' }}>Loading…</div>}>
-                        <Scene3D />
-                    </Suspense>
+                {/* Right — View */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+                    {/* View toggle */}
+                    <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, display: 'flex', gap: '2px', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', border: '1px solid var(--border)', borderRadius: '7px', padding: '2px' }}>
+                        {VIEWS.map(v => (
+                            <button key={v} onClick={() => setView(v)} style={{ padding: '4px 10px', borderRadius: '5px', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 600, transition: 'all 0.15s', background: view === v ? 'var(--accent)' : 'transparent', color: view === v ? '#fff' : 'var(--text-2)' }}>{v}</button>
+                        ))}
+                    </div>
+
+                    {view === '2D Grid' ? (
+                        <Grid2D />
+                    ) : (
+                        <Suspense fallback={<div style={{ color: 'var(--text-2)', padding: '40px', textAlign: 'center' }}>Loading…</div>}>
+                            <Scene3D />
+                        </Suspense>
+                    )}
                     {/* Hint overlay */}
                     <div style={{
                         position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
@@ -147,8 +184,10 @@ export default function ConnectionsStep() {
                         background: 'rgba(7,10,20,0.8)', border: '1px solid var(--border)',
                         backdropFilter: 'blur(10px)',
                         fontSize: '12px', color: 'var(--text-1)',
+                        zIndex: 10,
+                        pointerEvents: 'none'
                     }}>
-                        🔗 Connections rendered as animated tubes — hover for details
+                        {view === '2D Grid' ? '🖱️ Drag from one component to another to link them' : '🔗 Connections rendered as animated tubes — hover for details'}
                     </div>
                 </div>
             </div>

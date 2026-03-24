@@ -2,7 +2,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Text } from '@react-three/drei';
 import { useRef, useMemo, useState, useCallback } from 'react';
 import * as THREE from 'three';
-import useTwinStore from '../store/useTwinStore';
+import useTwinStore, { DOMAINS } from '../store/useTwinStore';
 
 const STATUS_COLORS = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
 
@@ -634,6 +634,13 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
     const d = ch * cellSize - 0.5;
     const h = Math.max(1.5, Math.min(ch * cellSize * 0.55, 8));
 
+    const { selectedDomain } = useTwinStore();
+    const domain = DOMAINS[selectedDomain] || DOMAINS.factory;
+    const bp = domain.components?.find(c => c.type === component.type);
+    const nativeGridSize = bp?.gridSize || [2, 2];
+    const nativeW = nativeGridSize[0] * cellSize - 0.5;
+    const nativeD = nativeGridSize[1] * cellSize - 0.5;
+
     const kpi = kpis.find(k => component.kpiIds?.includes(k.id));
     const statusColor = kpi ? STATUS_COLORS[kpi.status] : (component.color || '#6395ff');
 
@@ -646,11 +653,47 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
 
     useFrame((state) => {
         if (!groupRef.current) return;
-        if (kpi?.status === 'red') {
+        if (kpi && kpi.status !== 'green') {
             const t = state.clock.elapsedTime;
-            groupRef.current.children.forEach(child => {
-                if (child.material?.emissiveIntensity !== undefined && child !== glowRef.current) {
-                    child.material.emissiveIntensity = 0.08 + Math.sin(t * 3) * 0.06;
+            const interactionType = kpi.interaction || 'pulse';
+            const pulseVal = 0.05 + Math.max(0, Math.sin(t * 4)) * 0.4;
+            
+            groupRef.current.traverse(child => {
+                if (child.isMesh && child.material && child !== glowRef.current && !child.name?.includes('shadow')) {
+                    if (child.material.emissiveIntensity !== undefined) {
+                        // 1. Pulse interaction
+                        if (interactionType === 'pulse') {
+                            child.material.emissive = new THREE.Color(statusColor);
+                            child.material.emissiveIntensity = pulseVal;
+                        } 
+                        // 2. Transition interaction
+                        else if (interactionType === 'transition') {
+                            child.material.emissive = new THREE.Color(statusColor);
+                            child.material.emissiveIntensity = 0.25; 
+                        }
+                        // Glow handles emissive reset
+                        else if (interactionType === 'glow') {
+                            child.material.emissiveIntensity = 0;
+                        }
+                    }
+                }
+            });
+            
+            // 3. Glow interaction (Outer Box)
+            if (interactionType === 'glow' && glowRef.current) {
+                glowRef.current.visible = true;
+                glowRef.current.material.opacity = 0.4 + Math.sin(t * 2) * 0.2;
+            } else if (glowRef.current && !selected) {
+                glowRef.current.visible = false;
+            }
+        } else {
+            // Reset state if back to green
+            if (glowRef.current && !selected) glowRef.current.visible = false;
+            groupRef.current.traverse(child => {
+                if (child.isMesh && child.material && child !== glowRef.current) {
+                    if (child.material.emissiveIntensity !== undefined) {
+                        child.material.emissiveIntensity = 0;
+                    }
                 }
             });
         }
@@ -717,15 +760,15 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
             </mesh>
 
             {/* Domain-specific shape */}
-            <DomainShape type={component.type} w={w} d={d} h={h} color={statusColor} mesh3D={component.mesh3D} />
+            <group rotation={[0, THREE.MathUtils.degToRad(-(component.rotation || 0)), 0]}>
+                <DomainShape type={component.type} w={nativeW} d={nativeD} h={h} color={statusColor} mesh3D={component.mesh3D} />
+            </group>
 
-            {/* Selection glow */}
-            {selected && (
-                <mesh ref={glowRef} position={[0, h * 0.5, 0]}>
-                    <boxGeometry args={[w * 1.08, h * 1.05, d * 1.08]} />
-                    <meshBasicMaterial color="#6395ff" wireframe opacity={0.35} transparent />
-                </mesh>
-            )}
+            {/* KPI Outline Glow or Selection glow */}
+            <mesh ref={glowRef} position={[0, h * 0.5, 0]} visible={selected}>
+                <boxGeometry args={[w * 1.08, h * 1.05, d * 1.08]} />
+                <meshBasicMaterial color={selected ? '#6395ff' : statusColor} wireframe={selected} opacity={0.35} transparent depthWrite={false} />
+            </mesh>
 
             {/* KPI status indicator ring */}
             {kpi && (

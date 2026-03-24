@@ -1,15 +1,35 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Trash2, RotateCcw } from 'lucide-react';
 import useTwinStore from '../store/useTwinStore';
 
 const CELL_PX = 40;
 const STATUS_COLORS = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
 
 export default function Grid2D() {
-    const { components, connections, kpis, gridCols, gridRows, selectedComponentId, hoveredComponentId, selectComponent, hoverComponent, moveComponent } = useTwinStore();
+    const { currentStep, components, connections, kpis, gridCols, gridRows, selectedComponentId, hoveredComponentId, selectComponent, hoverComponent, moveComponent, removeComponent, addConnection, rotateComponent } = useTwinStore();
     const cols = gridCols || 10;
     const rows = gridRows || 8;
+    const isConnectionStep = currentStep === 3;
     const [dragging, setDragging] = useState(null); // { id, offsetCol, offsetRow }
     const [ghostPos, setGhostPos] = useState(null);  // { col, row }
+    const [linkingFrom, setLinkingFrom] = useState(null);
+    const [mousePos, setMousePos] = useState(null);
+    const gridRef = useRef(null);
+
+    const getCenter = (comp) => {
+        const [cw, ch] = comp.gridSize;
+        const w = CELL_PX * cw + (cw - 1);
+        const h = CELL_PX * ch + (ch - 1);
+        const left = comp.col * CELL_PX + comp.col;
+        const top = comp.row * CELL_PX + comp.row;
+        return { x: left + w / 2, y: top + h / 2 };
+    };
+
+    const handleMouseMove = (e) => {
+        if (!linkingFrom || !gridRef.current) return;
+        const rect = gridRef.current.getBoundingClientRect();
+        setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    };
 
     // Build occupied map
     const cellMap = {};
@@ -24,7 +44,11 @@ export default function Grid2D() {
 
     const handleMouseDown = (e, comp) => {
         e.preventDefault();
-        setDragging({ id: comp.id, gridSize: comp.gridSize });
+        if (isConnectionStep) {
+            setLinkingFrom(comp.id);
+        } else {
+            setDragging({ id: comp.id, gridSize: comp.gridSize });
+        }
         selectComponent(comp.id);
     };
 
@@ -39,6 +63,8 @@ export default function Grid2D() {
         }
         setDragging(null);
         setGhostPos(null);
+        setLinkingFrom(null);
+        setMousePos(null);
     };
 
     // Check if ghost fits
@@ -76,14 +102,36 @@ export default function Grid2D() {
 
                 {/* Grid */}
                 <div
+                    ref={gridRef}
                     style={{
+                        position: 'relative',
                         display: 'grid',
                         gridTemplateColumns: `repeat(${cols}, ${CELL_PX}px)`,
                         gridTemplateRows: `repeat(${rows}, ${CELL_PX}px)`,
                         gap: '1px',
-                        cursor: dragging ? 'grabbing' : 'default',
+                        cursor: dragging ? 'grabbing' : isConnectionStep && linkingFrom ? 'crosshair' : 'default',
                     }}
+                    onMouseMove={isConnectionStep && linkingFrom ? handleMouseMove : undefined}
                 >
+                    {isConnectionStep && (
+                        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 20, overflow: 'visible' }}>
+                            {connections.map(conn => {
+                                const src = components.find(c => c.id === conn.sourceId);
+                                const tgt = components.find(c => c.id === conn.targetId);
+                                if (!src || !tgt) return null;
+                                const p1 = getCenter(src);
+                                const p2 = getCenter(tgt);
+                                const color = STATUS_COLORS[conn.flowStatus] || '#10d98d';
+                                return <line key={conn.id} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={color} strokeWidth="3" strokeLinecap="round" opacity={0.6} />
+                            })}
+                            {linkingFrom && mousePos && (() => {
+                                const src = components.find(c => c.id === linkingFrom);
+                                if (!src) return null;
+                                const p1 = getCenter(src);
+                                return <line x1={p1.x} y1={p1.y} x2={mousePos.x} y2={mousePos.y} stroke="#6395ff" strokeWidth="2" strokeDasharray="4" strokeLinecap="round" />
+                            })()}
+                        </svg>
+                    )}
                     {Array.from({ length: rows }).map((_, row) =>
                         Array.from({ length: cols }).map((_, col) => {
                             const comp = cellMap[`${row}-${col}`];
@@ -122,7 +170,7 @@ export default function Grid2D() {
                                                         : `rgba(${hexRgb(comp.color)},0.12)`
                                             : isGhost
                                                 ? ghostFits ? 'rgba(99,149,255,0.15)' : 'rgba(239,68,68,0.15)'
-                                                : 'rgba(255,255,255,0.02)',
+                                                : 'rgba(255,255,255,0.08)',
                                         border: comp
                                             ? isDraggingThis
                                                 ? '1.5px dashed #6395ff'
@@ -133,9 +181,9 @@ export default function Grid2D() {
                                                         : `1px solid rgba(${hexRgb(comp.color)},0.35)`
                                             : isGhost
                                                 ? ghostFits ? '1.5px dashed #6395ff' : '1.5px dashed #ef4444'
-                                                : '1px solid rgba(255,255,255,0.04)',
+                                                : '1px solid rgba(255,255,255,0.15)',
                                         borderRadius: comp ? '5px' : '2px',
-                                        cursor: comp ? (dragging ? 'grabbing' : 'grab') : isGhost ? 'crosshair' : 'default',
+                                        cursor: comp ? (dragging ? 'grabbing' : isConnectionStep ? 'crosshair' : 'grab') : isGhost ? 'crosshair' : 'default',
                                         display: 'flex',
                                         flexDirection: 'column',
                                         alignItems: 'center',
@@ -147,6 +195,14 @@ export default function Grid2D() {
                                         boxShadow: isSelected && !isDraggingThis ? '0 0 10px rgba(99,149,255,0.2)' : 'none',
                                     }}
                                     onMouseDown={comp ? (e) => handleMouseDown(e, comp) : undefined}
+                                    onMouseUp={(e) => {
+                                        if (isConnectionStep && linkingFrom && comp && linkingFrom !== comp.id) {
+                                            e.stopPropagation();
+                                            addConnection(linkingFrom, comp.id);
+                                            setLinkingFrom(null);
+                                            setMousePos(null);
+                                        }
+                                    }}
                                     onMouseEnter={() => {
                                         if (comp) hoverComponent(comp.id);
                                         handleCellEnter(col, row);
@@ -161,7 +217,7 @@ export default function Grid2D() {
                                                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: statusColor, opacity: 0.9 }} />
                                             )}
                                             {/* Component type icon */}
-                                            <div style={{ fontSize: CELL_PX > 36 ? '14px' : '10px', lineHeight: 1, marginBottom: '2px' }}>
+                                            <div style={{ transform: `rotate(${comp.rotation || 0}deg)`, transition: 'transform 0.2s', fontSize: CELL_PX > 36 ? '14px' : '10px', lineHeight: 1, marginBottom: '2px' }}>
                                                 {getTypeIcon(comp.type)}
                                             </div>
                                             {/* Name */}
@@ -174,9 +230,78 @@ export default function Grid2D() {
                                                     {typeof kpi.value === 'number' ? kpi.value.toFixed(0) : kpi.value}{kpi.unit}
                                                 </span>
                                             )}
-                                            {/* Red pulse */}
-                                            {kpi?.status === 'red' && (
-                                                <div style={{ position: 'absolute', inset: 0, background: 'rgba(239,68,68,0.06)', animation: 'pulse-bg 1s ease-in-out infinite', borderRadius: '5px' }} />
+                                            {/* KPI Dynamic Interaction Layer */}
+                                            {kpi && kpi.status !== 'green' && (
+                                                <div style={{ 
+                                                    position: 'absolute', inset: 0, borderRadius: '5px', pointerEvents: 'none',
+                                                    ...(kpi.interaction === 'pulse' ? { background: `rgba(${hexRgb(statusColor)},0.15)`, animation: 'pulse-bg 1s ease-in-out infinite' } : {}),
+                                                    ...(kpi.interaction === 'transition' ? { background: `rgba(${hexRgb(statusColor)},0.25)` } : {}),
+                                                    ...(kpi.interaction === 'glow' ? { boxShadow: `inset 0 0 12px ${statusColor}, 0 0 8px ${statusColor}`, border: `2px solid ${statusColor}` } : {})
+                                                }} />
+                                            )}
+                                            {/* Rotate button */}
+                                            {isSelected && !isDraggingThis && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        rotateComponent(comp.id);
+                                                    }}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '4px',
+                                                        left: '4px',
+                                                        width: '18px',
+                                                        height: '18px',
+                                                        borderRadius: '50%',
+                                                        background: 'rgba(99,149,255,0.15)',
+                                                        border: '1px solid rgba(99,149,255,0.3)',
+                                                        color: '#6395ff',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: 'pointer',
+                                                        zIndex: 10,
+                                                        padding: 0,
+                                                    }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,149,255,0.25)'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,149,255,0.15)'; }}
+                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                    title="Rotate Component"
+                                                >
+                                                    <RotateCcw size={10} />
+                                                </button>
+                                            )}
+                                            {/* Delete button */}
+                                            {isSelected && !isDraggingThis && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        removeComponent(comp.id);
+                                                    }}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '4px',
+                                                        right: '4px',
+                                                        width: '18px',
+                                                        height: '18px',
+                                                        borderRadius: '50%',
+                                                        background: 'rgba(239,68,68,0.15)',
+                                                        border: '1px solid rgba(239,68,68,0.3)',
+                                                        color: '#ef4444',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        cursor: 'pointer',
+                                                        zIndex: 10,
+                                                        padding: 0,
+                                                    }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.25)'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; }}
+                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                    title="Delete Component"
+                                                >
+                                                    <Trash2 size={10} />
+                                                </button>
                                             )}
                                         </>
                                     )}

@@ -198,10 +198,11 @@ const useTwinStore = create((set, get) => ({
 
     initScene: () => {
         const { selectedDomain, gridCols, gridRows } = get();
-        const components = generateComponents(selectedDomain, gridCols, gridRows);
-        // Start with empty KPIs — real data comes from file source via WebSocket
+        // Start with empty components and connections
+        const components = [];
+        const connections = [];
         const kpiHistory = [];
-        set({ components, connections: generateConnections(components), kpis: [], kpiHistory });
+        set({ components, connections, kpis: [], kpiHistory });
     },
 
     addComponent: (type, overrides = {}) => {
@@ -261,6 +262,21 @@ const useTwinStore = create((set, get) => ({
         }));
     },
 
+    removeConnection: (id) => {
+        set(s => ({
+            connections: s.connections.filter(c => c.id !== id)
+        }));
+    },
+
+    addConnection: (sourceId, targetId) => {
+        set(s => {
+            if (sourceId === targetId) return s;
+            if (s.connections.some(c => c.sourceId === sourceId && c.targetId === targetId)) return s;
+            const newConn = { id: `conn_${Date.now()}_${Math.floor(Math.random()*1000)}`, sourceId, targetId, flowStatus: 'green' };
+            return { connections: [...s.connections, newConn] };
+        });
+    },
+
     moveComponent: (id, newCol, newRow) => {
         set(s => {
             const comp = s.components.find(c => c.id === id);
@@ -282,6 +298,41 @@ const useTwinStore = create((set, get) => ({
         });
     },
 
+    rotateComponent: (id) => {
+        set(s => {
+            const comp = s.components.find(c => c.id === id);
+            if (!comp) return s;
+            const [w, h] = comp.gridSize;
+            const newW = h;
+            const newH = w;
+            
+            const occupied = new Set();
+            s.components.forEach(c => {
+                if (c.id === id) return;
+                const [cw, ch] = c.gridSize;
+                for (let r = c.row; r < c.row + ch; r++)
+                    for (let cl = c.col; cl < c.col + cw; cl++)
+                        occupied.add(`${r}-${cl}`);
+            });
+            
+            for (let r = comp.row; r < comp.row + newH; r++) {
+                for (let c = comp.col; c < comp.col + newW; c++) {
+                    if (c >= s.gridCols || r >= s.gridRows || occupied.has(`${r}-${c}`)) {
+                        return s;
+                    }
+                }
+            }
+            
+            return {
+                components: s.components.map(c => 
+                    c.id === id 
+                        ? { ...c, gridSize: [newW, newH], rotation: ((c.rotation || 0) + 90) % 360 } 
+                        : c
+                )
+            };
+        });
+    },
+
     updateKpiValues: () => {
         set(s => {
             const newKpis = s.kpis.map(kpi => {
@@ -298,6 +349,13 @@ const useTwinStore = create((set, get) => ({
             newKpis.forEach(k => { newPoint[k.id] = k.value; });
             const newHistory = [...s.kpiHistory.slice(-49), newPoint];
             return { kpis: newKpis, kpiHistory: newHistory };
+        });
+    },
+
+    clearKpis: () => {
+        set(s => {
+            const newComponents = s.components.map(c => ({ ...c, kpiIds: [] }));
+            return { kpis: [], kpiHistory: [], components: newComponents };
         });
     },
 
@@ -321,6 +379,7 @@ const useTwinStore = create((set, get) => ({
                             value: reading.value,
                             status: reading.status || 'green',
                             unit: reading.unit || k.unit,
+                            interaction: reading.meta?.interaction || k.interaction || 'pulse',
                           }
                         : k
                 );
@@ -335,6 +394,7 @@ const useTwinStore = create((set, get) => ({
                     unit: reading.unit || '',
                     status: reading.status || 'green',
                     source: reading.source || 'realtime',
+                    interaction: reading.meta?.interaction || 'pulse',
                     rules: {
                         green:  rules.green  || [0, rules.orange?.[0] || 999],
                         orange: rules.orange || null,
