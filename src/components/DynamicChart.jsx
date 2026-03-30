@@ -6,7 +6,7 @@ import {
     ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 
-const COLORS = ['#6395ff', '#10d98d', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#f97316'];
+const COLORS = ['#4865f2', '#10d98d', '#f59e0b', '#f4723e', '#ef4444', '#06b6d4', '#f97316'];
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
@@ -193,7 +193,7 @@ export default function DynamicChart({ config, height = 220 }) {
                 {chart}
             </ResponsiveContainer>
             {config.insight && (
-                <div style={{ marginTop: '6px', fontSize: '10px', color: '#94a3c8', padding: '5px 10px', background: 'rgba(99,149,255,0.06)', borderRadius: '5px', borderLeft: '2px solid #6395ff' }}>
+                <div style={{ marginTop: '6px', fontSize: '10px', color: '#94a3c8', padding: '5px 10px', background: 'rgba(72,101,242,0.06)', borderRadius: '5px', borderLeft: '2px solid #4865f2' }}>
                     💡 {config.insight}
                 </div>
             )}

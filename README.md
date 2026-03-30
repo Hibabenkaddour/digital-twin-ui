@@ -86,49 +86,67 @@ A **5-step wizard** that builds and then monitors your digital twin in real-time
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start / 🇫🇷 Lancement Rapide
 
-### Prerequisites
-- **Python 3.11+**
+### Prerequisites / Prérequis
+- **Python 3.11+** (Assurez-vous d'avoir ajouté Python au PATH sur Windows)
 - **Node.js 20+**
-- **[Ollama](https://ollama.com)** (for AI features): `ollama pull llama3.2`
+- **[Ollama](https://ollama.com)** (pour les fonctionnalités d'IA locales) : `ollama pull llama3.2`
 
-### 1. Clone
+---
+
+### 1. Cloner le projet (Clone)
 
 ```bash
 git clone https://github.com/Hibabenkaddour/digital-twin-ui.git
 cd digital-twin-ui
 ```
 
-### 2. Backend
+### 2. Démarrer le Backend (API Python)
+
+Ouvrez un terminal au dossier racine du projet (là où se trouve ce fichier README), puis :
 
 ```bash
 cd digital-twin-backend
 
-# Create virtual environment
+# 1. Créer un environnement virtuel (Create virtual environment)
 python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # Linux / Mac
 
+# 2. Activer l'environnement virtuel (Activate)
+# Sur Windows :
+.\venv\Scripts\activate
+# Sur Linux / Mac :
+# source venv/bin/activate
+
+# 3. Installer les dépendances (Install packages)
 pip install -r requirements.txt
 
-# Configure (copy and edit)
+# 4. Configurer les variables d'environnement (Configure)
+# Sur Windows :
 copy .env.example .env
+# Sur Linux / Mac :
+# cp .env.example .env
 
-# Start backend
+# 5. Lancer le serveur (Start backend)
 python main.py
-# ✅ API: http://localhost:8000
-# ✅ Docs: http://localhost:8000/docs
 ```
+> ✅ **API prête sur** : http://localhost:8000  
+> ✅ **Documentation Swagger** : http://localhost:8000/docs
 
-### 3. Frontend
+---
+
+### 3. Démarrer le Frontend (UI React)
+
+Ouvrez un **nouveau terminal** (N'arrêtez pas le backend !) au dossier racine du projet (`digital-twin`), puis :
 
 ```bash
-# In a new terminal, from the repo root
+# 1. Installer les dépendances (Install Node modules)
 npm install
+
+# 2. Lancer l'interface utilisateur (Start Dev Server)
 npm run dev
-# ✅ App: http://localhost:5173
 ```
+> ✅ **Application prête sur** : http://localhost:5173
 
 ### 4. Sample Data
 
@@ -139,6 +157,34 @@ Ready-to-use CSV files are in `digital-twin-backend/sample_data/`:
 | `airport_data.csv` | Airport | passenger_flow · security_wait · gate_util · baggage_delay · checkin_queue · runway_movements |
 | `factory_data.csv` | Factory | machine_temp · throughput · pressure · quality_rate · downtime · belt_speed |
 | `warehouse_data.csv` | Warehouse | pick_rate · rack_fill · dock_util · cycle_time · conveyor · error_rate |
+
+---
+
+## 🗄️ Avancé : Base de Données (PostgreSQL) & Scripts de Données
+
+Le backend utilise **SQLite par défaut** (`digital_twin.db`) pour que le projet soit facile à lancer. Cependant, le projet est prêt pour la production avec **PostgreSQL**.
+
+### 1. Lancer PostgreSQL via Docker
+Un fichier `docker-compose.yml` est fourni dans le dossier backend.
+```bash
+cd digital-twin-backend
+docker-compose up -d
+```
+Cela démarrera une base de données fonctionnelle sur `localhost:5432` (utilisateur: `postgres`, mdp: `postgrespassword`).
+
+### 2. Connecter le projet à PostgreSQL
+Ouvrez le fichier `.env` du backend et ajoutez ou modifiez la ligne `DATABASE_URL` :
+```env
+DATABASE_URL=postgresql://postgres:postgrespassword@localhost:5432/digital_twin
+```
+Relancez ensuite `python main.py`.
+
+### 3. Scripts de Génération de Données (Data Generation)
+Dans le dossier `digital-twin-backend`, vous disposez de 3 scripts très utiles :
+
+- **`generate_sample_data.py`** : Génère les gros fichiers CSV consolidés (un par domaine) pour que vous puissiez tester l'upload de fichiers via l'interface UI. Les données incluent des anomalies et des heures de pointe.
+- **`generate_airport_data.py`** : Génère des KPI détaillés spécifiques uniquement à l'aéroport dans `sample_data/airport/` (un fichier CSV par composant).
+- **`generate_pg_data.py`** : **Script de Streaming Temps Réel.** Exécutez `python generate_pg_data.py` dans un terminal séparé. Il va injecter en continu (toutes les 2 secondes) de nouvelles données directement dans la base PostgreSQL / SQLite, imitant des capteurs IoT réels !
 
 ---
 
@@ -239,6 +285,15 @@ digital-twin-ui/           ← this repo
     ├── db/                        # SQLAlchemy + SQLite
     └── sample_data/               # Ready-to-use CSV files
 ```
+---
+
+## Ameliorations
+-Ajouter modification de la superficie de l'espace sans avoir à retourner à l'étape 1
+-Ajouter modification de la taille des composants
+-Ajouter posibilité de superposition des composants, importants pour certains domaines comme l'aéroportuaire
+-Ajouter possibilité CRUD et persistence d'un nouveau composant par l'utilisateur
+
+
 
 ---
 

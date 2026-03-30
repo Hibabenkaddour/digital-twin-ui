@@ -123,9 +123,9 @@ export default function DataSourcePanel() {
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           {[['upload','1 Upload'],['assign','2 Assign'],['live','3 Live']].map(([s, label]) => (
             <span key={s} style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '10px', transition: 'all 0.15s',
-              background: step === s ? 'rgba(99,149,255,0.2)' : 'transparent',
+              background: step === s ? 'rgba(72,101,242,0.2)' : 'transparent',
               color: step === s ? 'var(--accent)' : 'var(--text-2)',
-              border: `1px solid ${step === s ? 'rgba(99,149,255,0.4)' : 'transparent'}` }}>
+              border: `1px solid ${step === s ? 'rgba(72,101,242,0.4)' : 'transparent'}` }}>
               {label}
             </span>
           ))}
@@ -141,7 +141,7 @@ export default function DataSourcePanel() {
             <div onDrop={handleFileDrop} onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)} onClick={() => fileRef.current?.click()}
               style={{ border: `2px dashed ${dragOver ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '10px', padding: '24px 16px', textAlign: 'center', cursor: 'pointer', marginBottom: '12px',
-                background: dragOver ? 'rgba(99,149,255,0.06)' : 'var(--bg-0)', transition: 'all 0.15s' }}>
+                background: dragOver ? 'rgba(72,101,242,0.06)' : 'var(--bg-0)', transition: 'all 0.15s' }}>
               <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleFileDrop} style={{ display: 'none' }} />
               <div style={{ fontSize: '26px', marginBottom: '8px' }}>📂</div>
               {file
@@ -153,7 +153,7 @@ export default function DataSourcePanel() {
             </div>
 
             {/* Format guide */}
-            <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(99,149,255,0.05)', border: '1px solid rgba(99,149,255,0.15)', marginBottom: '12px' }}>
+            <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(72,101,242,0.05)', border: '1px solid rgba(72,101,242,0.15)', marginBottom: '12px' }}>
               <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', marginBottom: '5px' }}>Expected format</div>
               <div style={{ fontSize: '9px', color: 'var(--text-2)', fontFamily: 'monospace', lineHeight: 1.7 }}>
                 timestamp, kpi_col_1, kpi_col_2, kpi_col_3, …<br/>
@@ -181,7 +181,7 @@ export default function DataSourcePanel() {
             {error && <div style={{ fontSize: '11px', color: '#ef4444', marginBottom: '10px', padding: '6px 10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px' }}>{error}</div>}
 
             <button onClick={handleUpload} disabled={!file || loading}
-              style={{ width: '100%', padding: '10px', borderRadius: '10px', background: file ? 'linear-gradient(135deg,#6395ff,#8b5cf6)' : 'var(--bg-0)', border: '1px solid var(--border)', color: file ? '#fff' : 'var(--text-2)', fontSize: '12px', fontWeight: 700, cursor: file ? 'pointer' : 'not-allowed' }}>
+              style={{ width: '100%', padding: '10px', borderRadius: '10px', background: file ? 'linear-gradient(135deg,#4865f2,#f4723e)' : 'var(--bg-0)', border: '1px solid var(--border)', color: file ? '#fff' : 'var(--text-2)', fontSize: '12px', fontWeight: 700, cursor: file ? 'pointer' : 'not-allowed' }}>
               {loading ? '⏳ Analysing file…' : '🔍 Upload & Discover Columns'}
             </button>
           </>
@@ -211,7 +211,7 @@ export default function DataSourcePanel() {
               const stats = schema.columnStats?.[col];
               const a = assignments[col] || {};
               return (
-                <div key={col} style={{ marginBottom: '10px', padding: '10px', borderRadius: '8px', background: 'var(--bg-0)', border: `1px solid ${a.component_id ? 'rgba(99,149,255,0.3)' : 'var(--border)'}` }}>
+                <div key={col} style={{ marginBottom: '10px', padding: '10px', borderRadius: '8px', background: 'var(--bg-0)', border: `1px solid ${a.component_id ? 'rgba(72,101,242,0.3)' : 'var(--border)'}` }}>
                   {/* Column name + stats */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
                     <div>
@@ -222,7 +222,7 @@ export default function DataSourcePanel() {
                         </div>
                       )}
                     </div>
-                    {a.component_id && <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '8px', background: 'rgba(99,149,255,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,149,255,0.3)' }}>✓ assigned</span>}
+                    {a.component_id && <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '8px', background: 'rgba(72,101,242,0.15)', color: 'var(--accent)', border: '1px solid rgba(72,101,242,0.3)' }}>✓ assigned</span>}
                   </div>
 
                   {/* Row 1: Component selector */}
@@ -324,7 +324,7 @@ export default function DataSourcePanel() {
             ← Re-upload
           </button>
           <button onClick={handleSave} disabled={assignedCount === 0 || loading}
-            style={{ flex: 1, padding: '8px', borderRadius: '8px', background: assignedCount > 0 ? 'linear-gradient(135deg,#6395ff,#8b5cf6)' : 'var(--bg-0)', border: 'none', color: assignedCount > 0 ? '#fff' : 'var(--text-2)', fontSize: '12px', fontWeight: 700, cursor: assignedCount > 0 ? 'pointer' : 'not-allowed' }}>
+            style={{ flex: 1, padding: '8px', borderRadius: '8px', background: assignedCount > 0 ? 'linear-gradient(135deg,#4865f2,#f4723e)' : 'var(--bg-0)', border: 'none', color: assignedCount > 0 ? '#fff' : 'var(--text-2)', fontSize: '12px', fontWeight: 700, cursor: assignedCount > 0 ? 'pointer' : 'not-allowed' }}>
             {loading ? '⏳ Saving…' : `▶ Start Streaming (${assignedCount} columns)`}
           </button>
         </div>

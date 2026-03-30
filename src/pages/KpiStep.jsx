@@ -94,7 +94,7 @@ export default function KpiStep() {
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
                 {/* ── LEFT PANEL: Database Columns ── */}
-                <div style={{ width: '300px', flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'rgba(7,10,20,0.9)', overflow: 'hidden' }}>
+                <div style={{ width: '300px', flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.9)', overflow: 'hidden' }}>
                     <div style={{ padding: '20px 18px', borderBottom: '1px solid var(--border)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                             <Database size={15} color="var(--accent)" />
@@ -122,7 +122,7 @@ export default function KpiStep() {
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-1)', padding: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>KPI Formula Engine</h2>
-                        <button onClick={addKpi} style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(99,149,255,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,149,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}>
+                        <button onClick={addKpi} style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(72,101,242,0.1)', color: 'var(--accent)', border: '1px solid rgba(72,101,242,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}>
                             <Plus size={14} /> Add New KPI
                         </button>
                     </div>
@@ -163,7 +163,7 @@ export default function KpiStep() {
                                     </div>
                                     <div>
                                         <label style={{ fontSize: '10px', color: 'var(--accent)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Formula (Math)</label>
-                                        <input value={kpi.formula} onChange={e => updateKpi(kpi.kpi_id, 'formula', e.target.value)} placeholder="e.g. temp_1 + temp_2 * 1.5" style={{ width: '100%', background: 'rgba(99,149,255,0.05)', border: '1px solid rgba(99,149,255,0.3)', borderRadius: '6px', padding: '8px', color: '#fff', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }} />
+                                        <input value={kpi.formula} onChange={e => updateKpi(kpi.kpi_id, 'formula', e.target.value)} placeholder="e.g. temp_1 + temp_2 * 1.5" style={{ width: '100%', background: 'rgba(72,101,242,0.05)', border: '1px solid rgba(72,101,242,0.3)', borderRadius: '6px', padding: '8px', color: '#fff', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }} />
                                     </div>
                                     <div>
                                         <label style={{ fontSize: '10px', color: 'var(--text-2)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Unit</label>
@@ -206,7 +206,7 @@ export default function KpiStep() {
             </div>
 
             {/* ── FOOTER ── */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--border)', background: 'rgba(7,10,20,0.85)', backdropFilter: 'blur(10px)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--border)', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(10px)', flexShrink: 0 }}>
                 <button className="btn btn-ghost" onClick={() => setStep(3)}>
                     <ArrowLeft size={16} /> Back
                 </button>

@@ -128,7 +128,7 @@ export default function Grid2D() {
                                 const src = components.find(c => c.id === linkingFrom);
                                 if (!src) return null;
                                 const p1 = getCenter(src);
-                                return <line x1={p1.x} y1={p1.y} x2={mousePos.x} y2={mousePos.y} stroke="#6395ff" strokeWidth="2" strokeDasharray="4" strokeLinecap="round" />
+                                return <line x1={p1.x} y1={p1.y} x2={mousePos.x} y2={mousePos.y} stroke="#4865f2" strokeWidth="2" strokeDasharray="4" strokeLinecap="round" />
                             })()}
                         </svg>
                     )}
@@ -162,26 +162,26 @@ export default function Grid2D() {
                                         height: comp ? `${h}px` : `${CELL_PX}px`,
                                         background: comp
                                             ? isDraggingThis
-                                                ? 'rgba(99,149,255,0.08)'
+                                                ? 'rgba(72,101,242,0.08)'
                                                 : isSelected
-                                                    ? `rgba(99,149,255,0.18)`
+                                                    ? `rgba(72,101,242,0.18)`
                                                     : isHovered
-                                                        ? `rgba(99,149,255,0.1)`
+                                                        ? `rgba(72,101,242,0.1)`
                                                         : `rgba(${hexRgb(comp.color)},0.12)`
                                             : isGhost
-                                                ? ghostFits ? 'rgba(99,149,255,0.15)' : 'rgba(239,68,68,0.15)'
-                                                : 'rgba(255,255,255,0.08)',
+                                                ? ghostFits ? 'rgba(72,101,242,0.15)' : 'rgba(239,68,68,0.15)'
+                                                : 'rgba(72,101,242,0.03)',
                                         border: comp
                                             ? isDraggingThis
-                                                ? '1.5px dashed #6395ff'
+                                                ? '1.5px dashed #4865f2'
                                                 : isSelected
-                                                    ? '1.5px solid #6395ff'
+                                                    ? '1.5px solid #4865f2'
                                                     : isHovered
                                                         ? `1.5px solid rgba(${hexRgb(comp.color)},0.8)`
                                                         : `1px solid rgba(${hexRgb(comp.color)},0.35)`
                                             : isGhost
-                                                ? ghostFits ? '1.5px dashed #6395ff' : '1.5px dashed #ef4444'
-                                                : '1px solid rgba(255,255,255,0.15)',
+                                                ? ghostFits ? '1.5px dashed #4865f2' : '1.5px dashed #ef4444'
+                                                : '1px dashed rgba(72,101,242,0.25)',
                                         borderRadius: comp ? '5px' : '2px',
                                         cursor: comp ? (dragging ? 'grabbing' : isConnectionStep ? 'crosshair' : 'grab') : isGhost ? 'crosshair' : 'default',
                                         display: 'flex',
@@ -192,7 +192,7 @@ export default function Grid2D() {
                                         position: 'relative',
                                         transition: isDraggingThis ? 'none' : 'all 0.15s ease',
                                         opacity: isDraggingThis ? 0.4 : 1,
-                                        boxShadow: isSelected && !isDraggingThis ? '0 0 10px rgba(99,149,255,0.2)' : 'none',
+                                        boxShadow: isSelected && !isDraggingThis ? '0 0 10px rgba(72,101,242,0.2)' : 'none',
                                     }}
                                     onMouseDown={comp ? (e) => handleMouseDown(e, comp) : undefined}
                                     onMouseUp={(e) => {
@@ -221,7 +221,7 @@ export default function Grid2D() {
                                                 {getTypeIcon(comp.type)}
                                             </div>
                                             {/* Name */}
-                                            <span style={{ fontSize: '8px', fontWeight: 600, color: isSelected ? '#6395ff' : '#94a3c8', textAlign: 'center', lineHeight: 1.1, padding: '0 2px' }}>
+                                            <span style={{ fontSize: '8px', fontWeight: 600, color: isSelected ? '#4865f2' : '#94a3c8', textAlign: 'center', lineHeight: 1.1, padding: '0 2px' }}>
                                                 {comp.name.split(' ').slice(0, -1).join(' ')}
                                             </span>
                                             {/* KPI value */}
@@ -253,9 +253,9 @@ export default function Grid2D() {
                                                         width: '18px',
                                                         height: '18px',
                                                         borderRadius: '50%',
-                                                        background: 'rgba(99,149,255,0.15)',
-                                                        border: '1px solid rgba(99,149,255,0.3)',
-                                                        color: '#6395ff',
+                                                        background: 'rgba(72,101,242,0.15)',
+                                                        border: '1px solid rgba(72,101,242,0.3)',
+                                                        color: '#4865f2',
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
@@ -263,8 +263,8 @@ export default function Grid2D() {
                                                         zIndex: 10,
                                                         padding: 0,
                                                     }}
-                                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,149,255,0.25)'; }}
-                                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,149,255,0.15)'; }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.25)'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.15)'; }}
                                                     onMouseDown={(e) => e.stopPropagation()}
                                                     title="Rotate Component"
                                                 >
@@ -307,7 +307,7 @@ export default function Grid2D() {
                                     )}
                                     {/* Ghost cell */}
                                     {!comp && isGhost && (
-                                        <div style={{ width: '60%', height: '60%', borderRadius: '3px', background: ghostFits ? 'rgba(99,149,255,0.3)' : 'rgba(239,68,68,0.3)' }} />
+                                        <div style={{ width: '60%', height: '60%', borderRadius: '3px', background: ghostFits ? 'rgba(72,101,242,0.3)' : 'rgba(239,68,68,0.3)' }} />
                                     )}
                                 </div>
                             );

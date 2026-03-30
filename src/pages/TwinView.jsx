@@ -143,16 +143,16 @@ export default function TwinView() {
                     {/* Stats overlay — top left */}
                     <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', flexDirection: 'column', gap: '6px', pointerEvents: 'none' }}>
                         {[
-                            { icon: '⬡', label: 'Components', value: components.length, color: '#6395ff' },
+                            { icon: '⬡', label: 'Components', value: components.length, color: '#4865f2' },
                             { icon: '✅', label: 'OK', value: kpis.filter(k => k.status === 'green').length, color: '#10d98d' },
                             { icon: '⚠️', label: 'Warnings', value: warnKpis.length, color: '#f59e0b' },
                             { icon: '🚨', label: 'Critical', value: critKpis.length, color: '#ef4444' },
                         ].map(s => (
-                            <div key={s.label} style={{ padding: '5px 10px', borderRadius: '8px', background: 'rgba(9,18,32,0.88)', border: `1px solid ${s.color}28`, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div key={s.label} style={{ padding: '5px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.88)', border: `1px solid ${s.color}28`, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span style={{ fontSize: '13px' }}>{s.icon}</span>
                                 <div>
                                     <div style={{ fontSize: '15px', fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
-                                    <div style={{ fontSize: '9px', color: '#64748b' }}>{s.label}</div>
+                                    <div style={{ fontSize: '9px', color: 'var(--text-2)' }}>{s.label}</div>
                                 </div>
                             </div>
                         ))}
@@ -160,7 +160,7 @@ export default function TwinView() {
 
                     {/* No data overlay */}
                     {wsStatus !== 'live' && kpis.length === 0 && (
-                        <div style={{ position: 'absolute', bottom: '50px', left: '50%', transform: 'translateX(-50%)', padding: '10px 20px', borderRadius: '12px', background: 'rgba(9,18,32,0.9)', border: '1px solid rgba(99,149,255,0.3)', backdropFilter: 'blur(8px)', textAlign: 'center', pointerEvents: 'none' }}>
+                        <div style={{ position: 'absolute', bottom: '50px', left: '50%', transform: 'translateX(-50%)', padding: '10px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(72,101,242,0.3)', backdropFilter: 'blur(8px)', textAlign: 'center', pointerEvents: 'none' }}>
                             <div style={{ fontSize: '18px', marginBottom: '4px' }}>📂</div>
                             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>No data source connected</div>
                             <div style={{ fontSize: '10px', color: 'var(--text-2)' }}>Go to ← KPI Setup to upload and assign your data</div>
@@ -169,11 +169,11 @@ export default function TwinView() {
 
                     {/* Selected component tooltip */}
                     {selComp && (
-                        <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', padding: '8px 16px', borderRadius: '10px', background: 'rgba(9,18,32,0.92)', border: `1px solid ${selComp.color}55`, backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', padding: '8px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.92)', border: `1px solid ${selComp.color}55`, backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: selComp.color, flexShrink: 0 }} />
                             <div>
-                                <div style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>{selComp.name}</div>
-                                <div style={{ fontSize: '10px', color: '#94a3c8' }}>{selComp.type?.replace(/_/g, ' ')} · {selComp.gridSize?.join('×')} cells</div>
+                                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-0)' }}>{selComp.name}</div>
+                                <div style={{ fontSize: '10px', color: 'var(--text-2)' }}>{selComp.type?.replace(/_/g, ' ')} · {selComp.gridSize?.join('×')} cells</div>
                             </div>
                             {kpis.filter(k => selComp.kpiIds?.includes(k.id)).map(k => (
                                 <div key={k.id} style={{ textAlign: 'center' }}>
@@ -183,7 +183,7 @@ export default function TwinView() {
                                     <div style={{ fontSize: '9px', color: '#64748b' }}>{k.unit || k.name}</div>
                                 </div>
                             ))}
-                            <button onClick={() => selectComponent(null)} style={{ pointerEvents: 'all', fontSize: '10px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(99,149,255,0.12)', border: '1px solid rgba(99,149,255,0.3)', color: '#6395ff', cursor: 'pointer' }}>✕</button>
+                            <button onClick={() => selectComponent(null)} style={{ pointerEvents: 'all', fontSize: '10px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(72,101,242,0.12)', border: '1px solid rgba(72,101,242,0.3)', color: '#4865f2', cursor: 'pointer' }}>✕</button>
                         </div>
                     )}
                 </div>

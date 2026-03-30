@@ -642,7 +642,7 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
     const nativeD = nativeGridSize[1] * cellSize - 0.5;
 
     const kpi = kpis.find(k => component.kpiIds?.includes(k.id));
-    const statusColor = kpi ? STATUS_COLORS[kpi.status] : (component.color || '#6395ff');
+    const statusColor = kpi ? STATUS_COLORS[kpi.status] : (component.color || '#4865f2');
 
     const groupRef = useRef();
     const glowRef = useRef();
@@ -767,7 +767,7 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
             {/* KPI Outline Glow or Selection glow */}
             <mesh ref={glowRef} position={[0, h * 0.5, 0]} visible={selected}>
                 <boxGeometry args={[w * 1.08, h * 1.05, d * 1.08]} />
-                <meshBasicMaterial color={selected ? '#6395ff' : statusColor} wireframe={selected} opacity={0.35} transparent depthWrite={false} />
+                <meshBasicMaterial color={selected ? '#4865f2' : statusColor} wireframe={selected} opacity={0.35} transparent depthWrite={false} />
             </mesh>
 
             {/* KPI status indicator ring */}
@@ -779,7 +779,7 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
             )}
 
             {/* Component label + custom badge */}
-            <Text position={[0, h + 1.0, 0]} fontSize={0.75} color={selected ? '#6395ff' : '#94a3c8'} anchorX="center" anchorY="bottom" maxWidth={w}>
+            <Text position={[0, h + 1.0, 0]} fontSize={0.75} color={selected ? '#4865f2' : '#94a3c8'} anchorX="center" anchorY="bottom" maxWidth={w}>
                 {component.isCustom ? `${component.icon || '✨'} ${component.name}` : component.name}
             </Text>
             {/* Custom component sub-label */}
@@ -798,7 +798,7 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
 
             {/* Ctrl+drag hint when hovered */}
             {hovered && !selected && (
-                <Text position={[0, -0.5, 0]} fontSize={0.45} color="#6395ff" anchorX="center" anchorY="top" opacity={0.7}>
+                <Text position={[0, -0.5, 0]} fontSize={0.45} color="#4865f2" anchorX="center" anchorY="top" opacity={0.7}>
                     Ctrl+drag to move
                 </Text>
             )}
@@ -818,7 +818,7 @@ function ConnectionArc({ connection, components, cellSize }) {
     const sz = src.row * cellSize + (sh * cellSize) / 2;
     const tx = tgt.col * cellSize + (tw * cellSize) / 2;
     const tz = tgt.row * cellSize + (th * cellSize) / 2;
-    const color = STATUS_COLORS[connection.flowStatus] || '#6395ff';
+    const color = STATUS_COLORS[connection.flowStatus] || '#4865f2';
 
     const curve = useMemo(() => new THREE.CatmullRomCurve3([
         new THREE.Vector3(sx, 1.8, sz),
@@ -863,10 +863,10 @@ function Floor({ cols, rows, cellSz }) {
         <group>
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[totalW / 2, 0, totalD / 2]} receiveShadow>
                 <planeGeometry args={[totalW, totalD]} />
-                <meshStandardMaterial color="#060b12" roughness={0.95} metalness={0.05} />
+                <meshStandardMaterial color="#f0f4f8" roughness={0.95} metalness={0.05} />
             </mesh>
-            <lineSegments geometry={gridLines}><lineBasicMaterial color="#1a3050" opacity={0.6} transparent /></lineSegments>
-            <lineSegments geometry={borderLines}><lineBasicMaterial color="#2d5a8e" /></lineSegments>
+            <lineSegments geometry={gridLines}><lineBasicMaterial color="#94a3b8" opacity={0.8} transparent /></lineSegments>
+            <lineSegments geometry={borderLines}><lineBasicMaterial color="#4865f2" /></lineSegments>
         </group>
     );
 }
@@ -885,7 +885,7 @@ function Particles({ count = 40, spread, center }) {
         return g;
     }, [count]);
 
-    const mat = useMemo(() => new THREE.PointsMaterial({ color: '#6395ff', size: 0.2, transparent: true, opacity: 0.2, sizeAttenuation: true, depthWrite: false }), []);
+    const mat = useMemo(() => new THREE.PointsMaterial({ color: '#4865f2', size: 0.2, transparent: true, opacity: 0.2, sizeAttenuation: true, depthWrite: false }), []);
     useFrame(s => { if (mat) mat.opacity = 0.12 + Math.sin(s.clock.elapsedTime * 0.5) * 0.08; });
     return <points geometry={geo} material={mat} />;
 }
@@ -893,7 +893,7 @@ function Particles({ count = 40, spread, center }) {
 // ─── Scene Background ──────────────────────────────────────────────────────────
 function SceneBackground() {
     const { scene } = useThree();
-    useMemo(() => { scene.background = new THREE.Color('#04080f'); }, [scene]);
+    useMemo(() => { scene.background = new THREE.Color('#f4f5f7'); }, [scene]);
     return null;
 }
 
@@ -919,10 +919,10 @@ export default function Scene3D() {
             onPointerMissed={() => selectComponent(null)}
         >
             <SceneBackground />
-            <fog attach="fog" args={['#04080f', 130, 400]} />
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[40, 60, 30]} intensity={1.0} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-cx - 20} shadow-camera-right={cx + 20} shadow-camera-top={cz + 20} shadow-camera-bottom={-20} shadow-camera-far={250} />
-            <hemisphereLight args={['#1a3a6e', '#0a100a', 0.45]} />
+            <fog attach="fog" args={['#f4f5f7', 130, 400]} />
+            <ambientLight intensity={0.7} />
+            <directionalLight position={[40, 60, 30]} intensity={1.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-cx - 20} shadow-camera-right={cx + 20} shadow-camera-top={cz + 20} shadow-camera-bottom={-20} shadow-camera-far={250} />
+            <hemisphereLight args={['#ffffff', '#e2e4e9', 0.6]} />
             <pointLight position={[cx, 14, cz]} intensity={0.5} color="#4466dd" distance={160} />
 
             <Floor cols={cols} rows={rows} cellSz={cs} />

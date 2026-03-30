@@ -133,8 +133,8 @@ export default function FormStep() {
                             style={{
                                 padding: '14px 16px',
                                 borderRadius: '10px',
-                                background: 'rgba(99,149,255,0.08)',
-                                border: '1px solid rgba(99,149,255,0.2)',
+                                background: 'rgba(72,101,242,0.08)',
+                                border: '1px solid rgba(72,101,242,0.2)',
                                 marginBottom: '28px',
                                 display: 'flex',
                                 gap: '24px',

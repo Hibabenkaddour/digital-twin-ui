@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import useTwinStore from '../store/useTwinStore';
 
-const PALETTE = ['#6395ff', '#10d98d', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#f472b6', '#a3e635'];
+const PALETTE = ['#4865f2', '#10d98d', '#f59e0b', '#f4723e', '#ef4444', '#06b6d4', '#f472b6', '#a3e635'];
 const STATUS_COLOR = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
 
 const Tip = ({ active, payload, label }) => {
@@ -97,7 +97,7 @@ export default function KpiCharts() {
             {/* KPI summary cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '7px', flexShrink: 0 }}>
                 {displayKpis.map(kpi => {
-                    const sc = STATUS_COLOR[kpi.status] || '#6395ff';
+                    const sc = STATUS_COLOR[kpi.status] || '#4865f2';
                     return (
                         <div key={kpi.id} style={{ padding: '8px', background: 'var(--bg-0)', border: `1px solid ${sc}30`, borderTop: `2px solid ${sc}`, borderRadius: '8px' }}>
                             <div style={{ fontSize: '9px', color: 'var(--text-2)', marginBottom: '3px', lineHeight: 1.3 }}>{kpi.name}</div>

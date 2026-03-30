@@ -59,7 +59,7 @@ export default function KpiImport({ component, onClose, onImported }) {
 
     return (
         <div style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200,
+            position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.75)', zIndex: 200,
             display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)',
         }}>
             <div style={{
@@ -76,7 +76,7 @@ export default function KpiImport({ component, onClose, onImported }) {
                 </div>
 
                 {/* Step indicators */}
-                <div style={{ display: 'flex', padding: '10px 20px', gap: '8px', borderBottom: '1px solid var(--border)', background: 'rgba(99,149,255,0.04)' }}>
+                <div style={{ display: 'flex', padding: '10px 20px', gap: '8px', borderBottom: '1px solid var(--border)', background: 'rgba(72,101,242,0.04)' }}>
                     {[['upload', '📂 Upload'], ['preview', '🔍 Preview'], ['done', '✅ Done']].map(([s, label]) => (
                         <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 600, color: step === s ? 'var(--accent)' : 'var(--text-2)', opacity: step === s ? 1 : 0.5 }}>
                             {label}
@@ -96,7 +96,7 @@ export default function KpiImport({ component, onClose, onImported }) {
                                 style={{
                                     border: `2px dashed ${dragOver ? 'var(--accent)' : 'var(--border)'}`,
                                     borderRadius: '10px', padding: '28px', textAlign: 'center', cursor: 'pointer',
-                                    background: dragOver ? 'rgba(99,149,255,0.06)' : 'var(--bg-0)',
+                                    background: dragOver ? 'rgba(72,101,242,0.06)' : 'var(--bg-0)',
                                     transition: 'all 0.15s', marginBottom: '14px',
                                 }}
                             >
@@ -127,7 +127,7 @@ export default function KpiImport({ component, onClose, onImported }) {
                             {error && <div style={{ fontSize: '11px', color: '#ef4444', marginBottom: '10px', padding: '6px 10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px' }}>{error}</div>}
 
                             <button onClick={handleUpload} disabled={!file || !kpiName.trim() || loading}
-                                style={{ width: '100%', padding: '10px', borderRadius: '10px', background: 'linear-gradient(135deg,#6395ff,#8b5cf6)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: file && kpiName ? 'pointer' : 'not-allowed', opacity: file && kpiName ? 1 : 0.5 }}>
+                                style={{ width: '100%', padding: '10px', borderRadius: '10px', background: 'linear-gradient(135deg,#4865f2,#f4723e)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: file && kpiName ? 'pointer' : 'not-allowed', opacity: file && kpiName ? 1 : 0.5 }}>
                                 {loading ? '⏳ Parsing file...' : '⬆ Upload & Preview'}
                             </button>
                         </>
@@ -190,7 +190,7 @@ export default function KpiImport({ component, onClose, onImported }) {
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <button onClick={() => setStep('upload')} style={{ flex: '0 0 auto', padding: '9px 16px', borderRadius: '8px', background: 'var(--bg-0)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '12px', cursor: 'pointer' }}>← Back</button>
                                 <button onClick={handleRemap} disabled={loading}
-                                    style={{ flex: 1, padding: '9px', borderRadius: '8px', background: 'linear-gradient(135deg,#6395ff,#8b5cf6)', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                                    style={{ flex: 1, padding: '9px', borderRadius: '8px', background: 'linear-gradient(135deg,#4865f2,#f4723e)', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
                                     {loading ? '⏳ Saving...' : `✅ Confirm & Save ${rowsImported} rows`}
                                 </button>
                             </div>
@@ -206,7 +206,7 @@ export default function KpiImport({ component, onClose, onImported }) {
                                 KPI "<strong style={{ color: 'var(--accent)' }}>{kpiName}</strong>" is now linked to {component.name}.
                                 <br />You can now query it via Analytics AI.
                             </div>
-                            <button onClick={onClose} style={{ padding: '10px 28px', borderRadius: '10px', background: 'linear-gradient(135deg,#6395ff,#8b5cf6)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                            <button onClick={onClose} style={{ padding: '10px 28px', borderRadius: '10px', background: 'linear-gradient(135deg,#4865f2,#f4723e)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
                                 Close
                             </button>
                         </div>

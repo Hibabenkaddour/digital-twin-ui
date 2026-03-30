@@ -32,7 +32,7 @@ export default function ConnectionsStep() {
                 <div style={{
                     borderRight: '1px solid var(--border)',
                     display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                    background: 'rgba(7,10,20,0.85)',
+                    background: 'rgba(255,255,255,0.85)',
                 }}>
                     <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -41,7 +41,7 @@ export default function ConnectionsStep() {
                         </div>
                         <div style={{
                             padding: '12px', borderRadius: '8px',
-                            background: 'rgba(99,149,255,0.06)', border: '1px solid rgba(99,149,255,0.15)',
+                            background: 'rgba(72,101,242,0.06)', border: '1px solid rgba(72,101,242,0.15)',
                         }}>
                             <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, marginBottom: '4px' }}>
                                 {linkType.icon} {linkType.label}
@@ -164,7 +164,7 @@ export default function ConnectionsStep() {
                 {/* Right — View */}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
                     {/* View toggle */}
-                    <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, display: 'flex', gap: '2px', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', border: '1px solid var(--border)', borderRadius: '7px', padding: '2px' }}>
+                    <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, display: 'flex', gap: '2px', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(10px)', border: '1px solid var(--border)', borderRadius: '7px', padding: '2px' }}>
                         {VIEWS.map(v => (
                             <button key={v} onClick={() => setView(v)} style={{ padding: '4px 10px', borderRadius: '5px', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 600, transition: 'all 0.15s', background: view === v ? 'var(--accent)' : 'transparent', color: view === v ? '#fff' : 'var(--text-2)' }}>{v}</button>
                         ))}
@@ -181,7 +181,7 @@ export default function ConnectionsStep() {
                     <div style={{
                         position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
                         padding: '8px 16px', borderRadius: '100px',
-                        background: 'rgba(7,10,20,0.8)', border: '1px solid var(--border)',
+                        background: 'rgba(255,255,255,0.8)', border: '1px solid var(--border)',
                         backdropFilter: 'blur(10px)',
                         fontSize: '12px', color: 'var(--text-1)',
                         zIndex: 10,
@@ -195,7 +195,7 @@ export default function ConnectionsStep() {
             {/* Footer nav */}
             <div style={{
                 display: 'flex', justifyContent: 'space-between', padding: '12px 20px',
-                borderTop: '1px solid var(--border)', background: 'rgba(7,10,20,0.8)',
+                borderTop: '1px solid var(--border)', background: 'rgba(255,255,255,0.8)',
                 backdropFilter: 'blur(10px)', flexShrink: 0,
             }}>
                 <button className="btn btn-ghost" onClick={() => setStep(2)}>

@@ -18,7 +18,7 @@ export default function HomePage() {
             <div
                 style={{
                     padding: '80px 60px 60px',
-                    background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,149,255,0.08) 0%, transparent 70%)',
+                    background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(72,101,242,0.08) 0%, transparent 70%)',
                     borderBottom: '1px solid var(--border)',
                     textAlign: 'center',
                 }}
@@ -38,7 +38,7 @@ export default function HomePage() {
                         lineHeight: 1.05,
                         letterSpacing: '-0.03em',
                         marginBottom: '20px',
-                        background: 'linear-gradient(135deg, #f0f4ff 0%, #94a3c8 50%, #6395ff 100%)',
+                        background: 'linear-gradient(135deg, #f0f4ff 0%, #94a3c8 50%, #4865f2 100%)',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
                         backgroundClip: 'text',
@@ -81,7 +81,7 @@ export default function HomePage() {
                                 cursor: 'pointer',
                                 border: '1px solid var(--border)',
                                 borderRadius: '16px',
-                                background: 'rgba(17,24,39,0.5)',
+                                background: 'rgba(255,255,255,0.5)',
                                 transition: 'all 0.25s ease',
                                 position: 'relative',
                                 overflow: 'hidden',

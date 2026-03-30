@@ -60,7 +60,7 @@ export default function KpiPanel() {
 
       {/* Selected component info bar */}
       {selectedComp && (
-        <div style={{ padding: '7px 14px', borderBottom: '1px solid var(--border)', background: 'rgba(99,149,255,0.05)', flexShrink: 0 }}>
+        <div style={{ padding: '7px 14px', borderBottom: '1px solid var(--border)', background: 'rgba(72,101,242,0.05)', flexShrink: 0 }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)' }}>{selectedComp.name}</div>
           <div style={{ fontSize: '10px', color: 'var(--text-2)' }}>
             {selectedComp.type?.replace(/_/g, ' ')} · {selectedComp.kpiIds?.length || 0} KPI{selectedComp.kpiIds?.length !== 1 ? 's' : ''}
@@ -80,7 +80,7 @@ export default function KpiPanel() {
               Upload a file and assign KPI columns to components in the KPI Setup step.
             </div>
             <button onClick={() => setStep(4)}
-              style={{ padding: '8px 16px', borderRadius: '8px', background: 'linear-gradient(135deg,#6395ff,#8b5cf6)', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
+              style={{ padding: '8px 16px', borderRadius: '8px', background: 'linear-gradient(135deg,#4865f2,#f4723e)', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
               ← Go to KPI Setup
             </button>
           </div>
@@ -95,7 +95,7 @@ export default function KpiPanel() {
               No KPI columns were assigned to this component.
             </div>
             <button onClick={() => setStep(4)}
-              style={{ padding: '6px 14px', borderRadius: '8px', background: 'rgba(99,149,255,0.15)', border: '1px solid rgba(99,149,255,0.3)', color: 'var(--accent)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '6px 14px', borderRadius: '8px', background: 'rgba(72,101,242,0.15)', border: '1px solid rgba(72,101,242,0.3)', color: 'var(--accent)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
               ← KPI Setup to assign
             </button>
           </div>
@@ -103,7 +103,7 @@ export default function KpiPanel() {
 
         {/* KPI cards with live pulse on critical */}
         {filteredKpis.map(kpi => {
-          const color = STATUS_COLOR[kpi.status] || '#6395ff';
+          const color = STATUS_COLOR[kpi.status] || '#4865f2';
           const compNames = components.filter(c => c.kpiIds?.includes(kpi.id)).map(c => c.name);
           return (
             <div key={kpi.id}

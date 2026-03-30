@@ -2,30 +2,30 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg-0: #04050a;
-  --bg-1: #0b0e1a;
-  --bg-2: #111827;
-  --bg-3: #1a2233;
-  --bg-4: #1f2d42;
-  --border: rgba(99,149,255,0.12);
-  --border-glow: rgba(99,149,255,0.3);
-  --text-0: #f0f4ff;
-  --text-1: #94a3c8;
-  --text-2: #60718a;
-  --accent: #6395ff;
-  --accent-dim: rgba(99,149,255,0.15);
+  --bg-0: #f4f5f7;
+  --bg-1: #ffffff;
+  --bg-2: #e2e4e9;
+  --bg-3: #f9fafb;
+  --bg-4: #cbd5e1;
+  --border: rgba(72,101,242,0.15);
+  --border-glow: rgba(72,101,242,0.3);
+  --text-0: #1e293b;
+  --text-1: #475569;
+  --text-2: #64748b;
+  --accent: #4865f2;
+  --accent-dim: rgba(72,101,242,0.15);
   --green: #10d98d;
-  --orange: #f59e0b;
+  --orange: #f4723e; /* DXC Orange for status/badges if desired, but wait: keep #f59e0b for warning? Yes, better to keep warning as #f59e0b. Let's use #f59e0b for orange status. */
   --red: #ef4444;
   --font: 'Inter', system-ui, sans-serif;
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 16px;
   --r-xl: 24px;
-  --shadow-sm: 0 2px 8px rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 24px rgba(0,0,0,0.5);
-  --shadow-lg: 0 8px 48px rgba(0,0,0,0.6);
-  --glow: 0 0 24px rgba(99,149,255,0.2);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 24px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 48px rgba(0,0,0,0.12);
+  --glow: 0 0 24px rgba(72,101,242,0.2);
 }
 
 html, body, #root {
@@ -45,15 +45,16 @@ html, body, #root {
 
 /* ===== GLASS CARD ===== */
 .glass {
-  background: rgba(17,24,39,0.7);
+  background: rgba(255,255,255,0.7);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .glass-subtle {
-  background: rgba(17,24,39,0.4);
+  background: rgba(255,255,255,0.4);
   backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -75,11 +76,11 @@ html, body, #root {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #6395ff, #8b5cf6);
+  background: linear-gradient(135deg, var(--accent), var(--orange));
   color: white;
-  box-shadow: 0 4px 16px rgba(99,149,255,0.3);
+  box-shadow: 0 4px 16px rgba(72,101,242,0.3);
 }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(99,149,255,0.45); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(72,101,242,0.45); }
 .btn-primary:active { transform: translateY(0); }
 
 .btn-ghost {
@@ -112,7 +113,7 @@ html, body, #root {
   font-family: var(--font);
   transition: border-color 0.2s;
 }
-.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,149,255,0.1); }
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(72,101,242,0.1); }
 .input::placeholder { color: var(--text-2); }
 
 .label { font-size: 12px; font-weight: 600; color: var(--text-1); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; display: block; }
@@ -131,7 +132,7 @@ html, body, #root {
 .badge-green { background: rgba(16,217,141,0.15); color: var(--green); border: 1px solid rgba(16,217,141,0.25); }
 .badge-orange { background: rgba(245,158,11,0.15); color: var(--orange); border: 1px solid rgba(245,158,11,0.25); }
 .badge-red { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.25); }
-.badge-blue { background: rgba(99,149,255,0.15); color: var(--accent); border: 1px solid rgba(99,149,255,0.25); }
+.badge-blue { background: rgba(72,101,242,0.15); color: var(--accent); border: 1px solid rgba(72,101,242,0.25); }
 
 /* ===== STATUS DOT ===== */
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -151,7 +152,7 @@ html, body, #root {
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes glow-pulse { 0%, 100% { box-shadow: var(--glow); } 50% { box-shadow: 0 0 48px rgba(99,149,255,0.4); } }
+@keyframes glow-pulse { 0%, 100% { box-shadow: var(--glow); } 50% { box-shadow: 0 0 48px rgba(72,101,242,0.4); } }
 
 .animate-fade { animation: fadeIn 0.35s ease both; }
 .animate-slide { animation: slideIn 0.3s ease both; }
@@ -243,7 +244,7 @@ html, body, #root {
   border-color: var(--accent);
   background: var(--accent-dim);
   color: var(--accent);
-  box-shadow: 0 0 12px rgba(99,149,255,0.3);
+  box-shadow: 0 0 12px rgba(72,101,242,0.3);
 }
 .step-item.done .step-circle {
   border-color: var(--green);

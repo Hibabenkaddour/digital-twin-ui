@@ -129,7 +129,7 @@ export default function GridStep() {
 
         {/* AI Prompt toggle */}
         <button onClick={() => setShowAiBar(p => !p)} style={{ padding: '3px 11px', borderRadius: '7px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', flexShrink: 0,
-          background: showAiBar ? 'rgba(99,149,255,0.15)' : 'transparent',
+          background: showAiBar ? 'rgba(72,101,242,0.15)' : 'transparent',
           color: showAiBar ? 'var(--accent)' : 'var(--text-2)' }}>
           🦙 AI Layout
           <span style={{ fontSize: '8px', padding: '1px 4px', borderRadius: '4px', background: backendOnline ? 'rgba(16,217,141,0.2)' : 'rgba(245,158,11,0.2)', color: backendOnline ? '#10d98d' : '#f59e0b' }}>
@@ -137,14 +137,14 @@ export default function GridStep() {
           </span>
         </button>
 
-        <div style={{ padding: '3px 9px', borderRadius: '16px', background: 'rgba(99,149,255,0.1)', border: '1px solid rgba(99,149,255,0.2)', fontSize: '11px', fontWeight: 600, color: 'var(--accent)', flexShrink: 0 }}>
+        <div style={{ padding: '3px 9px', borderRadius: '16px', background: 'rgba(72,101,242,0.1)', border: '1px solid rgba(72,101,242,0.2)', fontSize: '11px', fontWeight: 600, color: 'var(--accent)', flexShrink: 0 }}>
           {components.length} components
         </div>
       </div>
 
       {/* AI Prompt Bar */}
       {showAiBar && (
-        <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'rgba(99,149,255,0.03)', flexShrink: 0 }}>
+        <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'rgba(72,101,242,0.03)', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '18px', paddingTop: '4px' }}>🦙</span>
             <div style={{ flex: 1 }}>
@@ -164,14 +164,14 @@ export default function GridStep() {
                   `Connect all components in sequence`,
                 ].map(ex => (
                   <button key={ex} onClick={() => setAiPrompt(ex)}
-                    style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(99,149,255,0.07)', border: '1px solid rgba(99,149,255,0.15)', color: 'var(--text-2)', cursor: 'pointer' }}>
+                    style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: 'rgba(72,101,242,0.07)', border: '1px solid rgba(72,101,242,0.15)', color: 'var(--text-2)', cursor: 'pointer' }}>
                     {ex}
                   </button>
                 ))}
               </div>
             </div>
             <button onClick={handleAiPrompt} disabled={!aiPrompt.trim() || aiLoading}
-              style={{ padding: '9px 18px', borderRadius: '8px', background: 'linear-gradient(135deg,#6395ff,#8b5cf6)', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: aiPrompt.trim() ? 'pointer' : 'not-allowed', opacity: aiPrompt.trim() ? 1 : 0.5, flexShrink: 0 }}>
+              style={{ padding: '9px 18px', borderRadius: '8px', background: 'linear-gradient(135deg,#4865f2,#f4723e)', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: aiPrompt.trim() ? 'pointer' : 'not-allowed', opacity: aiPrompt.trim() ? 1 : 0.5, flexShrink: 0 }}>
               {aiLoading ? '⏳' : '▶ Run'}
             </button>
           </div>

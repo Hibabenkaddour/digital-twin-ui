@@ -93,7 +93,7 @@ export default function Chatbot() {
       {/* Header */}
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg,#6395ff,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🦙</div>
+          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg,#4865f2,#f4723e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🦙</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-0)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               Analytics AI · Llama 3
@@ -136,7 +136,7 @@ export default function Chatbot() {
             <div style={{
               maxWidth: '96%', padding: '9px 13px',
               borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-              background: msg.role === 'user' ? 'linear-gradient(135deg,#6395ff,#8b5cf6)' : 'var(--bg-0)',
+              background: msg.role === 'user' ? 'linear-gradient(135deg,#4865f2,#f4723e)' : 'var(--bg-0)',
               border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
               fontSize: '12px', lineHeight: 1.6, color: msg.role === 'user' ? '#fff' : 'var(--text-1)',
               whiteSpace: 'pre-wrap',
@@ -169,9 +169,9 @@ export default function Chatbot() {
       {/* Suggestion chips */}
       <div style={{ padding: '6px 12px', display: 'flex', gap: '5px', flexWrap: 'wrap', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
         {displaySuggestions.slice(0, 4).map(s => (
-          <button key={s} onClick={() => handleSend(s)} style={{ padding: '3px 9px', borderRadius: '16px', fontSize: '10px', fontWeight: 500, background: 'rgba(99,149,255,0.08)', border: '1px solid rgba(99,149,255,0.2)', color: 'var(--accent)', cursor: 'pointer', transition: 'all 0.15s' }}
-            onMouseEnter={e => e.currentTarget.style.background='rgba(99,149,255,0.18)'}
-            onMouseLeave={e => e.currentTarget.style.background='rgba(99,149,255,0.08)'}>
+          <button key={s} onClick={() => handleSend(s)} style={{ padding: '3px 9px', borderRadius: '16px', fontSize: '10px', fontWeight: 500, background: 'rgba(72,101,242,0.08)', border: '1px solid rgba(72,101,242,0.2)', color: 'var(--accent)', cursor: 'pointer', transition: 'all 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.background='rgba(72,101,242,0.18)'}
+            onMouseLeave={e => e.currentTarget.style.background='rgba(72,101,242,0.08)'}>
             {s}
           </button>
         ))}
@@ -183,7 +183,7 @@ export default function Chatbot() {
           placeholder={backendOnline ? 'Ask about KPIs — Llama will analyze & chart…' : 'Ask about your KPIs…'}
           rows={2} style={{ flex: 1, background: 'var(--bg-0)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 10px', color: 'var(--text-0)', fontSize: '12px', resize: 'none', outline: 'none', fontFamily: 'inherit' }} />
         <button onClick={() => handleSend()} disabled={!input.trim()}
-          style={{ width: '38px', height: '38px', borderRadius: '9px', flexShrink: 0, alignSelf: 'flex-end', background: input.trim() ? 'linear-gradient(135deg,#6395ff,#8b5cf6)' : 'var(--bg-0)', border: '1px solid var(--border)', cursor: input.trim() ? 'pointer' : 'not-allowed', fontSize: '15px', transition: 'all 0.15s' }}>
+          style={{ width: '38px', height: '38px', borderRadius: '9px', flexShrink: 0, alignSelf: 'flex-end', background: input.trim() ? 'linear-gradient(135deg,#4865f2,#f4723e)' : 'var(--bg-0)', border: '1px solid var(--border)', cursor: input.trim() ? 'pointer' : 'not-allowed', fontSize: '15px', transition: 'all 0.15s' }}>
           ➤
         </button>
       </div>

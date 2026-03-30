@@ -9,7 +9,7 @@ export const DOMAINS = {
             { type: 'cnc_machine', name: 'CNC Machine', gridSize: [2, 2], color: '#6366f1' },
             { type: 'assembly_station', name: 'Assembly Station', gridSize: [2, 2], color: '#10b981' },
             { type: 'quality_control', name: 'Quality Control', gridSize: [2, 1], color: '#f59e0b' },
-            { type: 'warehouse_rack', name: 'Warehouse Rack', gridSize: [3, 1], color: '#8b5cf6' },
+            { type: 'warehouse_rack', name: 'Warehouse Rack', gridSize: [3, 1], color: '#f4723e' },
         ],
     },
     airport: {
@@ -183,7 +183,10 @@ const useTwinStore = create((set, get) => ({
         { id: 0, role: 'assistant', text: '👋 Hello! I\'m your Analytics AI powered by Llama 3.\n\nConnect your data source first (🔌 Source tab), then ask me anything about your KPIs.' }
     ],
 
-    setStep: (step) => set({ currentStep: step }),
+    setStep: (step) => set(s => ({
+        currentStep: step,
+        selectedComponentId: s.currentStep !== step ? null : s.selectedComponentId
+    })),
     setDomain: (domain) => set({ selectedDomain: domain }),
     setTwinName: (name) => set({ twinName: name }),
     setDimensions: (width, length) => {
@@ -207,7 +210,7 @@ const useTwinStore = create((set, get) => ({
 
     addComponent: (type, overrides = {}) => {
         const { selectedDomain, gridCols, gridRows, components } = get();
-        const bp = getBlueprint(selectedDomain, type) || { name: type, gridSize: [2, 2], color: '#6395ff' };
+        const bp = getBlueprint(selectedDomain, type) || { name: type, gridSize: [2, 2], color: '#4865f2' };
         const [w, h] = overrides.gridSize || bp.gridSize;
         const occupied = new Set();
         components.forEach(c => {

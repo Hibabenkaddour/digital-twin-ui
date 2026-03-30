@@ -18,7 +18,7 @@ export default function Navbar() {
             display: 'flex', alignItems: 'center', gap: '12px',
             padding: '0 20px', height: '52px', flexShrink: 0,
             borderBottom: '1px solid var(--border)',
-            background: 'rgba(4,5,10,0.95)',
+            background: 'rgba(255,255,255,0.95)',
             backdropFilter: 'blur(20px)',
             position: 'relative', zIndex: 100,
         }}>
@@ -36,10 +36,10 @@ export default function Navbar() {
                 {/* Logo mark */}
                 <div style={{
                     width: '28px', height: '28px', borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #6395ff, #8b5cf6)',
+                    background: 'linear-gradient(135deg, #4865f2, #f4723e)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '14px', fontWeight: 900, color: 'white',
-                    boxShadow: '0 0 12px rgba(99,149,255,0.4)',
+                    boxShadow: '0 0 12px rgba(72,101,242,0.4)',
                 }}>
                     ⬡
                 </div>
@@ -84,8 +84,8 @@ export default function Navbar() {
             {/* Right corner: DXC brand */}
             <div style={{
                 padding: '4px 12px', borderRadius: '6px',
-                background: 'rgba(99,149,255,0.08)',
-                border: '1px solid rgba(99,149,255,0.15)',
+                background: 'rgba(72,101,242,0.08)',
+                border: '1px solid rgba(72,101,242,0.15)',
                 fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
                 letterSpacing: '0.06em',
             }}>
