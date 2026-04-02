@@ -19,6 +19,10 @@ OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.2")
 OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL    = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
+# Groq support
+GROQ_API_KEY    = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL      = os.getenv("GROQ_MODEL", "llama3-8b-8192")
+
 _llm = None
 _llm_ready = None   # None = untested, True/False = tested
 
@@ -27,7 +31,46 @@ def _try_build_llm():
     """Try to build an LLM instance. Returns None if unavailable."""
     global _llm, _llm_ready
 
-    # 1) Prefer Ollama (local Llama)
+    groq_api_key = os.getenv("GROQ_API_KEY", "")
+    groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+    # 1) Try Groq if key is present
+    if groq_api_key:
+        try:
+            from langchain_openai import ChatOpenAI
+            # Use Groq's OpenAI compatible endpoint
+            _llm = ChatOpenAI(
+                api_key=groq_api_key, 
+                base_url="https://api.groq.com/openai/v1", 
+                model=groq_model, 
+                temperature=0.1
+            )
+            # Test connectivity
+            _llm.invoke("ping")
+            _llm_ready = True
+            print(f"✅ Groq LLM ready: {groq_model}")
+            return _llm
+        except Exception as e:
+            print(f"⚠️  Groq unavailable: {e}")
+            _llm_ready = False
+            return None
+
+    openai_api_key = os.getenv("OPENAI_API_KEY", "")
+    openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+    # 2) Fallback to OpenAI if key is set
+    if openai_api_key and not openai_api_key.startswith("sk-YOUR"):
+        try:
+            from langchain_openai import ChatOpenAI
+            _llm = ChatOpenAI(model=openai_model, temperature=0.1, api_key=openai_api_key)
+            _llm_ready = True
+            return _llm
+        except Exception as e:
+            print(f"⚠️  OpenAI unavailable: {e}")
+            _llm_ready = False
+            return None
+
+    # 3) Fallback to built-in Ollama
     if USE_OLLAMA:
         try:
             from langchain_ollama import ChatOllama
@@ -43,18 +86,6 @@ def _try_build_llm():
             _llm_ready = False
             return None
 
-    # 2) Fallback to OpenAI if key is set
-    if OPENAI_API_KEY and not OPENAI_API_KEY.startswith("sk-YOUR"):
-        try:
-            from langchain_openai import ChatOpenAI
-            _llm = ChatOpenAI(model=OPENAI_MODEL, temperature=0.1, api_key=OPENAI_API_KEY)
-            _llm_ready = True
-            return _llm
-        except Exception as e:
-            print(f"⚠️  OpenAI unavailable: {e}")
-            _llm_ready = False
-            return None
-
     _llm_ready = False
     return None
 
@@ -63,10 +94,12 @@ def get_llm():
     global _llm, _llm_ready
     if _llm_ready is True:
         return _llm
-    if _llm_ready is False:
-        return None
+        
+    # Reload environment in case .env was modified while server is running
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+    
     return _try_build_llm()
-
 
 def has_real_llm() -> bool:
     return get_llm() is not None

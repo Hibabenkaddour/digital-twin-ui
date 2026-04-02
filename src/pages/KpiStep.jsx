@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ArrowLeft, Database, Plus, Trash2, Zap, Palette, Focus } from 'lucide-react';
 import useTwinStore from '../store/useTwinStore';
+import { proposeKpis } from '../services/api';
 
 const BASE_URL = 'http://localhost:8000';  // Adjust if needed, Vite proxy assumes same host if empty but backend is 8000 usually
 
@@ -10,6 +11,7 @@ export default function KpiStep() {
     const [columns, setColumns] = useState([]);
     const [assignments, setAssignments] = useState([]); 
     const [loading, setLoading] = useState(false);
+    const [aiLoading, setAiLoading] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -44,6 +46,35 @@ export default function KpiStep() {
                 interaction: 'pulse'
             }
         ]);
+    };
+
+    const handleSuggestKpis = async () => {
+        if (!columns.length) return;
+        setAiLoading(true);
+        setError('');
+        try {
+            const data = await proposeKpis(selectedDomain, columns);
+            if (data && data.kpis) {
+                const newAssignments = data.kpis.map(k => ({
+                    kpi_id: `kpi_${Date.now()}_${Math.random().toString(36).substring(2,7)}`,
+                    component_id: components[0]?.id || '',
+                    kpi_name: k.kpi_name || 'AI KPI',
+                    formula: k.formula || '',
+                    unit: k.unit || '',
+                    rules: { 
+                        orange: [k.orange ?? null, null], 
+                        red: [k.red ?? null, null], 
+                        direction: k.direction || 'asc' 
+                    },
+                    interaction: k.interaction || 'pulse'
+                }));
+                setAssignments(prev => [...prev, ...newAssignments]);
+            }
+        } catch (err) {
+            setError('Failed to fetch AI suggestions: ' + err.message);
+        } finally {
+            setAiLoading(false);
+        }
     };
 
     const updateKpi = (id, field, value) => {
@@ -122,9 +153,14 @@ export default function KpiStep() {
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-1)', padding: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>KPI Formula Engine</h2>
-                        <button onClick={addKpi} style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(72,101,242,0.1)', color: 'var(--accent)', border: '1px solid rgba(72,101,242,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}>
-                            <Plus size={14} /> Add New KPI
-                        </button>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button onClick={handleSuggestKpis} disabled={aiLoading || columns.length === 0} style={{ padding: '8px 14px', borderRadius: '8px', background: 'linear-gradient(135deg,#4865f2,#f4723e)', color: '#fff', border: 'none', cursor: (aiLoading || columns.length === 0) ? 'not-allowed' : 'pointer', opacity: (aiLoading || columns.length === 0) ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700 }}>
+                                {aiLoading ? '🔄 Thinking...' : '✨ AI Suggestions'}
+                            </button>
+                            <button onClick={addKpi} style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(72,101,242,0.1)', color: 'var(--accent)', border: '1px solid rgba(72,101,242,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}>
+                                <Plus size={14} /> Add New KPI
+                            </button>
+                        </div>
                     </div>
 
                     {error && (

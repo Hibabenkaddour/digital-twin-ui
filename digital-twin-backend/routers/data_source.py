@@ -140,6 +140,16 @@ def assign_columns(payload: AssignmentsPayload):
 
     return {"saved": len(new_assignments), "assignments": new_assignments}
 
+class ProposeKpisRequest(BaseModel):
+    domain: str
+    columns: List[str]
+
+@router.post("/propose_kpis")
+async def propose_kpis_endpoint(payload: ProposeKpisRequest):
+    from agents.kpi_agent import propose_kpis
+    kpis = await propose_kpis(payload.domain, payload.columns)
+    return {"kpis": kpis}
+
 @router.get("/status")
 def get_status():
     from connectors.postgres_connector import get_postgres_connector

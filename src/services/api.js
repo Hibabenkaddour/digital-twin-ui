@@ -57,6 +57,13 @@ export async function importKpiFile(file, componentId, kpiName, { valueCol, time
     return res.json();
 }
 
+export async function proposeKpis(domain, columns) {
+    return apiFetch('/source/propose_kpis', {
+        method: 'POST',
+        body: JSON.stringify({ domain, columns }),
+    });
+}
+
 export async function getComponentKpis(componentId, kpiName, limit = 200) {
     const params = new URLSearchParams();
     if (kpiName) params.set('kpi_name', kpiName);

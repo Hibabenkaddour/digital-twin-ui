@@ -172,27 +172,131 @@ def mock_parse_prompt(prompt: str, layout: dict) -> dict:
     return {"actions": actions, "explanation": explanation}
 
 
+# ─── Helper: find closest free cell ───────────────────────────────────────────
+def check_collision(components: list[dict], row: int, col: int, w: int, h: int) -> bool:
+    for c in components:
+        cw, ch = c.get("gridSize", [2, 2])
+        # AABB collision
+        if row < c["row"] + ch and row + h > c["row"] and col < c["col"] + cw and col + w > c["col"]:
+            return True
+    return False
+
+def find_closest_free_cell(components: list[dict], cols: int, rows: int, size: list[int], target_row: int, target_col: int) -> tuple[int, int]:
+    """Finds the closest non-overlapping cell to the target via concentric rectangles."""
+    w, h = size
+    
+    # Boundary clamp target
+    t_r = max(0, min(target_row, rows - h))
+    t_c = max(0, min(target_col, cols - w))
+    
+    if not check_collision(components, t_r, t_c, w, h):
+        return t_r, t_c
+        
+    # Search radius
+    for radius in range(1, max(cols, rows)):
+        for r in range(max(0, t_r - radius), min(rows - h + 1, t_r + radius + 1)):
+            for c in range(max(0, t_c - radius), min(cols - w + 1, t_c + radius + 1)):
+                # Only check perimeter of the expanded search box
+                if abs(r - t_r) == radius or abs(c - t_c) == radius:
+                    if not check_collision(components, r, c, w, h):
+                        return r, c
+                        
+    return t_r, t_c # Fallback, let it overlap if grid is 100% full
+
 # ─── LLM system prompt ────────────────────────────────────────────────────────
-LAYOUT_SYSTEM_PROMPT = """You are an expert Digital Twin layout planner.
+LAYOUT_SYSTEM_PROMPT = """You are an elite Digital Twin Spatial Architect AND a 3D modeling expert.
 Given a natural language instruction and the current layout state (JSON), generate a JSON object with:
 - "actions": array of layout actions
-- "explanation": a concise explanation of what you did
+- "explanation": a concise, operational explanation of what you did.
 
-Each action has one of these shapes:
-- Add:     {"action":"add","componentType":"<type>","componentName":"<name>","row":<int>,"col":<int>,"gridSize":[w,h],"color":"<hex>"}
-- Move:    {"action":"move","componentId":"<id>","row":<int>,"col":<int>}
-- Remove:  {"action":"remove","componentId":"<id>"}
-- Connect: {"action":"connect","sourceId":"<id>","targetId":"<id>"}
-- Resize:  {"action":"resize","componentId":"<id>","gridSize":[w,h]}
+═══════════════════════════════════════════════════
+ACTION FORMATS
+═══════════════════════════════════════════════════
 
-Rules:
-- Use only component types from the domain palette.
-- Never place components outside the grid bounds.
-- Never overlap components.
-- Row and col are 0-indexed.
-- Return ONLY valid JSON, no markdown.
+1. Add standard (from domain palette):
+   {"action":"add", "componentType":"<type_from_availableTypes>", "componentName":"<name>", "row":<int>, "col":<int>}
+
+2. Add custom (ANY new real-world object):
+   {"action":"add", "componentType":"custom_<snake_case>", "componentName":"<name>", "row":<int>, "col":<int>,
+    "isCustom":true, "gridSize":[w,h], "color":"<main_hex_color>", "icon":"<emoji>",
+    "mesh3D":{"parts":[ ...array of 3D primitives... ]}}
+
+3. Move:   {"action":"move", "componentId":"<id>", "row":<int>, "col":<int>}
+4. Remove: {"action":"remove", "componentId":"<id>"}
+
+═══════════════════════════════════════════════════
+RULE #1: USE STANDARD TYPES FIRST
+═══════════════════════════════════════════════════
+If the requested object matches an `availableTypes` entry, use "Add standard". Do NOT create a custom component for paletteitems.
+
+═══════════════════════════════════════════════════
+RULE #2: 3D MODELING FOR CUSTOM COMPONENTS
+═══════════════════════════════════════════════════
+For custom components, you MUST generate a `mesh3D.parts` array that faithfully represents the REAL-WORLD physical shape of the object.
+Think like a 3D artist: decompose the object into simple primitives and assemble them.
+
+Each part in the array is a JSON object:
+{
+  "geo": "box" | "cylinder" | "sphere" | "cone" | "torus",
+  "pos": [x, y, z],    // Position as FRACTIONS of component width(x), height(y), depth(z). [0,0,0]=ground center.
+  "size": [...],        // Geometry dimensions as fractions (see below)
+  "rot": [rx, ry, rz],  // Rotation in DEGREES (optional, default [0,0,0])
+  "color": "#hex",      // Color of this specific part
+  "metalness": 0.0-1.0, // Metal look (optional, default 0.5)
+  "roughness": 0.0-1.0, // Surface roughness (optional, default 0.3)
+  "emissive": "#hex",   // Glow color (optional, for lights/screens)
+  "emissiveIntensity": 0.0-2.0, // Glow strength (optional)
+  "opacity": 0.0-1.0    // Transparency (optional, default 1.0)
+}
+
+Size conventions per geometry:
+- box:      [width_frac, height_frac, depth_frac]  (fractions of w, h, d)
+- cylinder: [radiusTop_frac, radiusBottom_frac, height_frac, segments]  (radius as fraction of min(w,d), height as fraction of h)
+- sphere:   [radius_frac, widthSegments, heightSegments]  (radius as fraction of min(w,d))
+- cone:     [radius_frac, height_frac, segments]
+- torus:    [radius_frac, tube_frac, radialSegments, tubularSegments]
+
+═══════════════════════════════════════════════════
+EXAMPLES OF REAL-WORLD 3D MODELING
+═══════════════════════════════════════════════════
+
+Robotic Arm:
+"parts": [
+  {"geo":"cylinder","pos":[0,0.08,0],"size":[0.35,0.4,0.15],"color":"#374151","metalness":0.6},
+  {"geo":"box","pos":[0,0.35,0],"size":[0.08,0.4,0.08],"color":"#3b82f6","metalness":0.7},
+  {"geo":"sphere","pos":[0,0.55,0],"size":[0.06],"color":"#9ca3af","metalness":0.8},
+  {"geo":"box","pos":[0.12,0.7,0],"size":[0.06,0.3,0.06],"rot":[0,0,-30],"color":"#3b82f6","metalness":0.7},
+  {"geo":"sphere","pos":[0.2,0.85,0],"size":[0.05],"color":"#ef4444","emissive":"#ef4444","emissiveIntensity":0.8}
+]
+
+Water Tank:
+"parts": [
+  {"geo":"cylinder","pos":[0,0.4,0],"size":[0.4,0.4,0.7],"color":"#9ca3af","metalness":0.7,"roughness":0.2},
+  {"geo":"sphere","pos":[0,0.82,0],"size":[0.4],"color":"#9ca3af","metalness":0.7},
+  {"geo":"cylinder","pos":[0,0.05,0],"size":[0.42,0.42,0.08],"color":"#374151","metalness":0.5},
+  {"geo":"box","pos":[0.3,0.3,0],"size":[0.04,0.5,0.04],"color":"#6b7280","metalness":0.6},
+  {"geo":"sphere","pos":[0.3,0.55,0],"size":[0.03],"color":"#ef4444","emissive":"#ef4444","emissiveIntensity":1.0}
+]
+
+Solar Panel:
+"parts": [
+  {"geo":"box","pos":[0,0.04,0],"size":[0.9,0.02,0.9],"color":"#1e3a5f","metalness":0.9,"roughness":0.1},
+  {"geo":"box","pos":[0,0.06,0],"size":[0.88,0.01,0.88],"color":"#3b82f6","metalness":0.8,"roughness":0.05,"emissive":"#1e40af","emissiveIntensity":0.3},
+  {"geo":"cylinder","pos":[0,0.02,0],"size":[0.03,0.03,0.04],"color":"#6b7280","metalness":0.6},
+  {"geo":"box","pos":[-0.35,0.04,0],"size":[0.02,0.01,0.8],"color":"#9ca3af"},
+  {"geo":"box","pos":[0.35,0.04,0],"size":[0.02,0.01,0.8],"color":"#9ca3af"}
+]
+
+═══════════════════════════════════════════════════
+SPATIAL RULES
+═══════════════════════════════════════════════════
+- Grid: row=0, col=0 (top-left) to row=(gridRows-1), col=(gridCols-1).
+- "Top right" -> row=0, col=max.  "Next to X" -> col = X.col + X.width.
+- DO NOT overlap. The backend will auto-correct collisions, but try your best.
+- To reposition EXISTING items, use "move" with the exact componentId.
+
+Return ONLY valid JSON.
 """
-
 
 # ─── Apply actions to state ───────────────────────────────────────────────────
 def apply_actions(state_dict: dict, actions: list[dict]) -> dict:
@@ -207,24 +311,55 @@ def apply_actions(state_dict: dict, actions: list[dict]) -> dict:
 
         if act == "add":
             comp_type = action.get("componentType", "unknown")
+            is_custom = action.get("isCustom", False)
+            
+            # Default to palette size if not custom
+            g_size = action.get("gridSize", [2, 2])
+            clr = action.get("color", "#6395ff")
+            if not is_custom:
+                domain = state_dict.get("domain", "factory")
+                palette = DOMAIN_DEFAULTS.get(domain, DOMAIN_DEFAULTS["factory"])
+                if comp_type in palette:
+                    g_size = palette[comp_type]["gridSize"]
+                    clr = action.get("color", palette[comp_type]["color"]) # Allow llm to override color
+            
+            # Smart positioning: Anti-collision
+            target_row = action.get("row", 0)
+            target_col = action.get("col", 0)
+            safe_row, safe_col = find_closest_free_cell(components, cols, rows, g_size, target_row, target_col)
+            
             new_comp = {
                 "id": f"{comp_type}_{uuid.uuid4().hex[:6]}",
                 "name": action.get("componentName", comp_type.replace("_", " ").title()),
                 "type": comp_type,
-                "row": max(0, min(action.get("row", 0), rows - 1)),
-                "col": max(0, min(action.get("col", 0), cols - 1)),
-                "gridSize": action.get("gridSize", [2, 2]),
-                "color": action.get("color", "#6395ff"),
+                "row": safe_row,
+                "col": safe_col,
+                "gridSize": g_size,
+                "color": clr,
                 "kpiIds": [],
+                "isCustom": is_custom,
             }
+            if is_custom:
+                new_comp["icon"] = action.get("icon", "✨")
+                new_comp["mesh3D"] = action.get("mesh3D", {"shape": "box"})
+                
             components.append(new_comp)
 
         elif act == "move":
             cid = action.get("componentId")
             for c in components:
                 if c["id"] == cid:
-                    c["row"] = max(0, min(action.get("row", c["row"]), rows - 1))
-                    c["col"] = max(0, min(action.get("col", c["col"]), cols - 1))
+                    current_g_size = c.get("gridSize", [2, 2])
+                    
+                    # Temporarily remove self from collision check
+                    temp_components = [tc for tc in components if tc["id"] != cid]
+                    
+                    target_row = action.get("row", c["row"])
+                    target_col = action.get("col", c["col"])
+                    safe_row, safe_col = find_closest_free_cell(temp_components, cols, rows, current_g_size, target_row, target_col)
+                    
+                    c["row"] = safe_row
+                    c["col"] = safe_col
                     break
 
         elif act == "remove":

@@ -14,6 +14,10 @@ class ComponentSchema(BaseModel):
     gridSize: list[int] = [2, 2]
     color: str = "#6395ff"
     kpiIds: list[str] = []
+    isCustom: bool = False
+    icon: Optional[str] = None
+    description: Optional[str] = None
+    mesh3D: Optional[dict] = None
 
 class ConnectionSchema(BaseModel):
     id: str
@@ -47,6 +51,9 @@ class LayoutAction(BaseModel):
     sourceId: Optional[str] = None
     targetId: Optional[str] = None
     color: Optional[str] = None
+    isCustom: Optional[bool] = None
+    icon: Optional[str] = None
+    mesh3D: Optional[dict] = None
 
 class LayoutPromptResponse(BaseModel):
     actions: list[LayoutAction]
