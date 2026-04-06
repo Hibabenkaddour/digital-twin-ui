@@ -193,6 +193,20 @@ const useTwinStore = create((set, get) => ({
         const cellSize = 6;
         set({ width, length, gridCols: Math.ceil(width / cellSize), gridRows: Math.ceil(length / cellSize), cellSize });
     },
+    resizeGrid: (cols, rows) => set(s => {
+        let minCols = 1;
+        let minRows = 1;
+        s.components.forEach(c => {
+            const w = c.col + c.gridSize[0];
+            const h = c.row + c.gridSize[1];
+            if (w > minCols) minCols = w;
+            if (h > minRows) minRows = h;
+        });
+        
+        const newCols = Math.max(minCols, cols);
+        const newRows = Math.max(minRows, rows);
+        return { gridCols: newCols, gridRows: newRows, width: newCols * s.cellSize, length: newRows * s.cellSize };
+    }),
     selectComponent: (id) => set({ selectedComponentId: id }),
     hoverComponent: (id) => set({ hoveredComponentId: id }),
     toggleSidebar: () => set(s => ({ sidebarOpen: !s.sidebarOpen })),
@@ -330,6 +344,49 @@ const useTwinStore = create((set, get) => ({
                 components: s.components.map(c => 
                     c.id === id 
                         ? { ...c, gridSize: [newW, newH], rotation: ((c.rotation || 0) + 90) % 360 } 
+                        : c
+                )
+            };
+        });
+    },
+
+    renameComponent: (id, newName) => {
+        set(s => ({
+            components: s.components.map(c => 
+                c.id === id ? { ...c, name: newName } : c
+            )
+        }));
+    },
+
+    resizeComponent: (id, newWidth, newHeight) => {
+        set(s => {
+            const comp = s.components.find(c => c.id === id);
+            if (!comp) return s;
+            // Minimum 1x1
+            if (newWidth < 1 || newHeight < 1) return s;
+            // Check grid bounds
+            if (comp.col + newWidth > s.gridCols || comp.row + newHeight > s.gridRows) return s;
+
+            // Check collisions with other components
+            const occupied = new Set();
+            s.components.forEach(c => {
+                if (c.id === id) return;
+                const [cw, ch] = c.gridSize;
+                for (let r = c.row; r < c.row + ch; r++)
+                    for (let cl = c.col; cl < c.col + cw; cl++)
+                        occupied.add(`${r}-${cl}`);
+            });
+
+            for (let r = comp.row; r < comp.row + newHeight; r++) {
+                for (let c = comp.col; c < comp.col + newWidth; c++) {
+                    if (occupied.has(`${r}-${c}`)) return s;
+                }
+            }
+
+            return {
+                components: s.components.map(c =>
+                    c.id === id
+                        ? { ...c, gridSize: [newWidth, newHeight] }
                         : c
                 )
             };

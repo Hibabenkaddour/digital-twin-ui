@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Trash2, RotateCcw } from 'lucide-react';
+import { Trash2, RotateCcw, Plus, Minus } from 'lucide-react';
 import useTwinStore from '../store/useTwinStore';
 
 const CELL_PX = 40;
 const STATUS_COLORS = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
 
 export default function Grid2D() {
-    const { currentStep, components, connections, kpis, gridCols, gridRows, selectedComponentId, hoveredComponentId, selectComponent, hoverComponent, moveComponent, removeComponent, addConnection, rotateComponent } = useTwinStore();
+    const { currentStep, components, connections, kpis, gridCols, gridRows, selectedComponentId, hoveredComponentId, selectComponent, hoverComponent, moveComponent, removeComponent, addConnection, rotateComponent, resizeComponent, renameComponent } = useTwinStore();
     const cols = gridCols || 10;
     const rows = gridRows || 8;
     const isConnectionStep = currentStep === 3;
@@ -83,10 +83,141 @@ export default function Grid2D() {
         return true;
     };
 
+    const selectedComp = selectedComponentId ? components.find(c => c.id === selectedComponentId) : null;
+
     return (
         <div style={{ position: 'relative', overflow: 'auto', flex: 1, userSelect: 'none' }} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+            {/* Selected component properties bar */}
+            {selectedComp && !dragging && (
+                <div style={{
+                    position: 'sticky', top: 0, zIndex: 15,
+                    display: 'flex', alignItems: 'center', gap: '12px',
+                    padding: '6px 14px',
+                    background: 'var(--bg-1, #f8f9fc)',
+                    borderBottom: '1px solid rgba(72,101,242,0.2)',
+                    boxShadow: '0 2px 8px rgba(72,101,242,0.06)',
+                }}>
+                    {/* Component info */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '14px' }}>{getTypeIcon(selectedComp.type)}</span>
+                        <input 
+                            value={selectedComp.name}
+                            onChange={(e) => renameComponent(selectedComp.id, e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            style={{ 
+                                fontSize: '12px', 
+                                fontWeight: 600, 
+                                color: 'var(--text-1, #1e293b)', 
+                                background: 'transparent',
+                                border: '1px solid transparent',
+                                borderBottom: '1px solid dashed rgba(72,101,242,0.4)',
+                                borderRadius: '2px',
+                                outline: 'none',
+                                padding: '2px 4px',
+                                width: '140px',
+                                transition: 'all 0.2s ease'
+                            }}
+                            onFocus={e => e.currentTarget.style.borderBottom = '1px solid #4865f2'}
+                            onBlur={e => e.currentTarget.style.borderBottom = '1px solid dashed rgba(72,101,242,0.4)'}
+                            title="Rename Component"
+                        />
+                    </div>
+
+                    {/* Separator */}
+                    <div style={{ width: '1px', height: '20px', background: 'rgba(72,101,242,0.15)' }} />
+
+                    {/* Width controls */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--text-2, #94a3c8)', fontWeight: 700, letterSpacing: '0.05em' }}>Width</span>
+                        <button
+                            onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0] - 1, selectedComp.gridSize[1])}
+                            disabled={selectedComp.gridSize[0] <= 1}
+                            style={{
+                                width: '22px', height: '22px', borderRadius: '5px',
+                                border: '1px solid rgba(72,101,242,0.25)',
+                                background: selectedComp.gridSize[0] <= 1 ? 'rgba(72,101,242,0.03)' : 'rgba(72,101,242,0.08)',
+                                color: selectedComp.gridSize[0] <= 1 ? 'rgba(148,163,200,0.3)' : '#4865f2',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: selectedComp.gridSize[0] <= 1 ? 'not-allowed' : 'pointer', padding: 0,
+                                transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={e => { if (selectedComp.gridSize[0] > 1) e.currentTarget.style.background = 'rgba(72,101,242,0.18)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = selectedComp.gridSize[0] <= 1 ? 'rgba(72,101,242,0.03)' : 'rgba(72,101,242,0.08)'; }}
+                            title="Decrease width"
+                        >
+                            <Minus size={12} />
+                        </button>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#4865f2', minWidth: '18px', textAlign: 'center' }}>{selectedComp.gridSize[0]}</span>
+                        <button
+                            onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0] + 1, selectedComp.gridSize[1])}
+                            style={{
+                                width: '22px', height: '22px', borderRadius: '5px',
+                                border: '1px solid rgba(72,101,242,0.25)',
+                                background: 'rgba(72,101,242,0.08)', color: '#4865f2',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: 'pointer', padding: 0,
+                                transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.18)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.08)'; }}
+                            title="Increase width"
+                        >
+                            <Plus size={12} />
+                        </button>
+                    </div>
+
+                    {/* Separator */}
+                    <div style={{ width: '1px', height: '20px', background: 'rgba(72,101,242,0.15)' }} />
+
+                    {/* Height controls */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--text-2, #94a3c8)', fontWeight: 700, letterSpacing: '0.05em' }}>Height</span>
+                        <button
+                            onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0], selectedComp.gridSize[1] - 1)}
+                            disabled={selectedComp.gridSize[1] <= 1}
+                            style={{
+                                width: '22px', height: '22px', borderRadius: '5px',
+                                border: '1px solid rgba(72,101,242,0.25)',
+                                background: selectedComp.gridSize[1] <= 1 ? 'rgba(72,101,242,0.03)' : 'rgba(72,101,242,0.08)',
+                                color: selectedComp.gridSize[1] <= 1 ? 'rgba(148,163,200,0.3)' : '#4865f2',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: selectedComp.gridSize[1] <= 1 ? 'not-allowed' : 'pointer', padding: 0,
+                                transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={e => { if (selectedComp.gridSize[1] > 1) e.currentTarget.style.background = 'rgba(72,101,242,0.18)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = selectedComp.gridSize[1] <= 1 ? 'rgba(72,101,242,0.03)' : 'rgba(72,101,242,0.08)'; }}
+                            title="Decrease height"
+                        >
+                            <Minus size={12} />
+                        </button>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#4865f2', minWidth: '18px', textAlign: 'center' }}>{selectedComp.gridSize[1]}</span>
+                        <button
+                            onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0], selectedComp.gridSize[1] + 1)}
+                            style={{
+                                width: '22px', height: '22px', borderRadius: '5px',
+                                border: '1px solid rgba(72,101,242,0.25)',
+                                background: 'rgba(72,101,242,0.08)', color: '#4865f2',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: 'pointer', padding: 0,
+                                transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.18)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.08)'; }}
+                            title="Increase height"
+                        >
+                            <Plus size={12} />
+                        </button>
+                    </div>
+
+                    {/* Dimensions display */}
+                    <span style={{ fontSize: '10px', color: 'var(--text-2, #94a3c8)', fontWeight: 500, marginLeft: '4px' }}>
+                        ({selectedComp.gridSize[0]}×{selectedComp.gridSize[1]} cells)
+                    </span>
+                </div>
+            )}
+
             {/* Column headers */}
-            <div style={{ display: 'flex', paddingLeft: '24px', marginBottom: '2px', position: 'sticky', top: 0, background: 'var(--bg-1)', zIndex: 5 }}>
+            <div style={{ display: 'flex', paddingLeft: '24px', marginBottom: '2px', position: 'sticky', top: selectedComp && !dragging ? '36px' : 0, background: 'var(--bg-1)', zIndex: 5 }}>
                 {Array.from({ length: cols }).map((_, c) => (
                     <div key={c} style={{ width: CELL_PX, textAlign: 'center', fontSize: '8px', color: 'var(--text-2)', flexShrink: 0 }}>{c + 1}</div>
                 ))}
@@ -220,9 +351,8 @@ export default function Grid2D() {
                                             <div style={{ transform: `rotate(${comp.rotation || 0}deg)`, transition: 'transform 0.2s', fontSize: CELL_PX > 36 ? '14px' : '10px', lineHeight: 1, marginBottom: '2px' }}>
                                                 {getTypeIcon(comp.type)}
                                             </div>
-                                            {/* Name */}
                                             <span style={{ fontSize: '8px', fontWeight: 600, color: isSelected ? '#4865f2' : '#94a3c8', textAlign: 'center', lineHeight: 1.1, padding: '0 2px' }}>
-                                                {comp.name.split(' ').slice(0, -1).join(' ')}
+                                                {comp.name}
                                             </span>
                                             {/* KPI value */}
                                             {kpi && (
@@ -303,6 +433,7 @@ export default function Grid2D() {
                                                     <Trash2 size={10} />
                                                 </button>
                                             )}
+
                                         </>
                                     )}
                                     {/* Ghost cell */}

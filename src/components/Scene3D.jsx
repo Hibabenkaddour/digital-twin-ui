@@ -592,16 +592,17 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
     const [cw, ch] = component.gridSize;
     const worldX = component.col * cellSize + (cw * cellSize) / 2;
     const worldZ = component.row * cellSize + (ch * cellSize) / 2;
+    const isRotated = (component.rotation || 0) % 180 !== 0;
+    const intrinsicCw = isRotated ? ch : cw;
+    const intrinsicCh = isRotated ? cw : ch;
+
     const w = cw * cellSize - 0.5;
     const d = ch * cellSize - 0.5;
-    const h = Math.max(1.5, Math.min(ch * cellSize * 0.55, 8));
+    const localW = intrinsicCw * cellSize - 0.5;
+    const localD = intrinsicCh * cellSize - 0.5;
+    const h = Math.max(1.5, Math.min(intrinsicCh * cellSize * 0.55, 8));
 
     const { selectedDomain } = useTwinStore();
-    const domain = DOMAINS[selectedDomain] || DOMAINS.factory;
-    const bp = domain.components?.find(c => c.type === component.type);
-    const nativeGridSize = bp?.gridSize || [2, 2];
-    const nativeW = nativeGridSize[0] * cellSize - 0.5;
-    const nativeD = nativeGridSize[1] * cellSize - 0.5;
 
     const kpi = kpis.find(k => component.kpiIds?.includes(k.id));
     const statusColor = kpi ? STATUS_COLORS[kpi.status] : (component.color || '#4865f2');
@@ -723,7 +724,7 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
 
             {/* Domain-specific shape */}
             <group rotation={[0, THREE.MathUtils.degToRad(-(component.rotation || 0)), 0]}>
-                <DomainShape type={component.type} w={nativeW} d={nativeD} h={h} color={statusColor} mesh3D={component.mesh3D} />
+                <DomainShape type={component.type} w={localW} d={localD} h={h} color={statusColor} mesh3D={component.mesh3D} />
             </group>
 
             {/* KPI Outline Glow or Selection glow */}

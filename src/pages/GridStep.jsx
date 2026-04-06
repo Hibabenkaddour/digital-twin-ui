@@ -8,7 +8,7 @@ const VIEWS = ['2D Grid', '3D Preview', 'Split'];
 
 export default function GridStep() {
   const { selectedDomain, components, connections, kpis, gridCols, gridRows, cellSize,
-          setStep, addComponent, moveComponent, twinName, selectComponent } = useTwinStore();
+          setStep, addComponent, moveComponent, twinName, selectComponent, resizeGrid } = useTwinStore();
 
   const [view, setView] = useState('Split');
   const [aiPrompt, setAiPrompt] = useState('');
@@ -20,6 +20,15 @@ export default function GridStep() {
 
   const domain = DOMAINS[selectedDomain];
   const blueprints = domain?.components || [];
+
+  let minCols = 1;
+  let minRows = 1;
+  components.forEach(c => {
+      const w = c.col + c.gridSize[0];
+      const h = c.row + c.gridSize[1];
+      if (w > minCols) minCols = w;
+      if (h > minRows) minRows = h;
+  });
 
   useEffect(() => {
     checkBackendHealth().then(setBackendOnline);
@@ -199,7 +208,23 @@ export default function GridStep() {
           <div style={{ flex: view === 'Split' ? '0 0 50%' : '1', borderRight: view === 'Split' ? '1px solid var(--border)' : 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
             <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-1)' }}>⬜ 2D EDITOR</span>
-              <span style={{ fontSize: '10px', color: 'var(--text-2)' }}>Drag to reposition · {gridCols}×{gridRows}</span>
+              <div style={{ fontSize: '10px', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                <span>Drag to reposition</span>
+                <span style={{ opacity: 0.3 }}>|</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>Grid Size:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    Width 
+                    <button onClick={() => resizeGrid(gridCols - 1, gridRows)} disabled={gridCols <= minCols} style={{ background: 'var(--bg-2)', opacity: gridCols <= minCols ? 0.3 : 1, border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: gridCols <= minCols ? 'not-allowed' : 'pointer', color: 'var(--text-1)', padding: 0 }}>-</button>
+                    <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{gridCols}</span>
+                    <button onClick={() => resizeGrid(gridCols + 1, gridRows)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-1)', padding: 0 }}>+</button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    Height
+                    <button onClick={() => resizeGrid(gridCols, gridRows - 1)} disabled={gridRows <= minRows} style={{ background: 'var(--bg-2)', opacity: gridRows <= minRows ? 0.3 : 1, border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: gridRows <= minRows ? 'not-allowed' : 'pointer', color: 'var(--text-1)', padding: 0 }}>-</button>
+                    <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{gridRows}</span>
+                    <button onClick={() => resizeGrid(gridCols, gridRows + 1)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-1)', padding: 0 }}>+</button>
+                </div>
+              </div>
             </div>
             <div style={{ flex: 1, overflow: 'auto' }}><Grid2D /></div>
           </div>
