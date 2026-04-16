@@ -3,6 +3,9 @@ import time
 import random
 import psycopg2
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Database Connection Details
 DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgrespassword@localhost:5432/digital_twin")

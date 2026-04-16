@@ -3,7 +3,7 @@ import { ChevronRight, ArrowLeft, Database, Plus, Trash2, Zap, Palette, Focus } 
 import useTwinStore from '../store/useTwinStore';
 import { proposeKpis } from '../services/api';
 
-const BASE_URL = 'http://localhost:8000';  // Adjust if needed, Vite proxy assumes same host if empty but backend is 8000 usually
+const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export default function KpiStep() {
     const { setStep, components, selectedDomain } = useTwinStore();

@@ -11,8 +11,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import useTwinStore from '../store/useTwinStore';
 
-const WS_URL = (domain = 'airport') =>
-  `ws://localhost:8000/ws/kpis?domain=${domain}`;
+const WS_URL = (domain = 'airport') => {
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  const wsBase = baseUrl.replace(/^http/, 'ws');
+  return `${wsBase}/ws/kpis?domain=${domain}`;
+};
 
 const STATUS = {
   CONNECTING: 'connecting',

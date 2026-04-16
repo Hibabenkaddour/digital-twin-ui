@@ -110,6 +110,9 @@ async def startup():
     asyncio.create_task(kpi_broadcaster(), name="kpi_broadcaster")
     logger.info("📡 WebSocket broadcaster started — ws://localhost:8000/ws/kpis")
 
+    from services.simulator import simulator_loop
+    asyncio.create_task(simulator_loop(), name="simulator_loop")
+
     await _start_connectors()
     logger.info("✅ Digital Twin Backend v2.1 ready — http://localhost:8000/docs")
 

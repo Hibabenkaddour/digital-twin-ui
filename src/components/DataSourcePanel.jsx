@@ -11,7 +11,7 @@
 import { useState, useRef, useEffect } from 'react';
 import useTwinStore from '../store/useTwinStore';
 
-const BASE_URL = '';  // uses Vite proxy
+const BASE_URL = import.meta.env.VITE_API_URL || '';  // uses Vite proxy locally
 
 export default function DataSourcePanel() {
   const { components, selectedDomain } = useTwinStore();
