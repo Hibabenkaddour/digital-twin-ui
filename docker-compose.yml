@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: dt2_postgres
+    environment:
+      POSTGRES_USER: dt2_user
+      POSTGRES_PASSWORD: dt2_pass
+      POSTGRES_DB: dt2_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dt2_user -d dt2_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: dt2_backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://dt2_user:dt2_pass@db:5432/dt2_db
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  pgdata:

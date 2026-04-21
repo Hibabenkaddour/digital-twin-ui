@@ -234,8 +234,8 @@ const useTwinStore = create((set, get) => ({
       return { ...kpi, value: clamped, status };
     });
     const newPoint = { time: new Date().toLocaleTimeString() };
-    newKpis.forEach(k => { newPoint[k.id] = k.value; });
-    return { kpis: newKpis, kpiHistory: [...s.kpiHistory.slice(-49), newPoint] };
+    newKpis.forEach(k => { newPoint[k.id] = k.value; newPoint[k.name] = k.value; });
+    return { kpis: newKpis, kpiHistory: [...s.kpiHistory.slice(-59), newPoint] };
   }),
 
   clearKpis: () => set(s => ({
@@ -269,8 +269,17 @@ const useTwinStore = create((set, get) => ({
       }
     }
     const newPoint = { time: new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) };
-    newKpis.forEach(k => { newPoint[k.id] = typeof k.value === 'number' ? +k.value.toFixed(2) : k.value; });
-    return { kpis: newKpis, kpiHistory: [...s.kpiHistory.slice(-59), newPoint], components: newComponents };
+    newKpis.forEach(k => {
+      const v = typeof k.value === 'number' ? +k.value.toFixed(2) : k.value;
+      newPoint[k.id]   = v;
+      newPoint[k.name] = v;  // allow Chart dataKey by name
+    });
+    // Update connection flow_status if reading contains it
+    let newConnections = s.connections;
+    if (reading.flowStatus) {
+      newConnections = s.connections.map(cn => ({ ...cn, flowStatus: reading.flowStatus }));
+    }
+    return { kpis: newKpis, kpiHistory: [...s.kpiHistory.slice(-59), newPoint], components: newComponents, connections: newConnections };
   }),
 
   sendMessage: (text) => {
