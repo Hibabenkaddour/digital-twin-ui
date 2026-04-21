@@ -18,7 +18,20 @@ export default function KpiStep() {
       .then(data => {
         setColumns(data.columns || []);
         const savedAssig = data.assignments || {};
-        const arr = Object.entries(savedAssig).map(([kpi_id, val]) => ({ kpi_id, ...val }));
+        // Transform server flat fields → local nested rules structure
+        const arr = Object.entries(savedAssig).map(([kpi_id, val]) => ({
+          kpi_id,
+          component_id: val.component_id || '',
+          kpi_name:     val.kpi_name     || '',
+          formula:      val.formula      || '',
+          unit:         val.unit         || '',
+          interaction:  val.interaction  || 'pulse',
+          rules: {
+            orange:    [val.orange_threshold ?? null, null],
+            red:       [val.red_threshold    ?? null, null],
+            direction:  val.direction        || 'asc',
+          },
+        }));
         if (arr.length > 0) setAssignments(arr);
       })
       .catch(e => setError('Failed to connect to backend: ' + e.message));
