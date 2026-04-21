@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Legend, BarChart, Bar, Cell
+  ResponsiveContainer, ReferenceLine, Legend, BarChart, Bar, Cell,
+  AreaChart, Area
 } from 'recharts';
 import useTwinStore from '../store/useTwinStore';
 import Scene3D from '../components/Scene3D';
@@ -232,26 +233,202 @@ function ChartsPanel({ kpis, kpiHistory, selectedDomain }) {
   );
 }
 
-// ─── Chat Panel ───────────────────────────────────────────────
-function ChatPanel() {
-  const { chatMessages, sendMessage } = useTwinStore();
+// ─── NLQ Chat Panel ───────────────────────────────────────────
+function ChatPanel({ selectedDomain }) {
+  const [messages, setMessages] = useState([
+    { id: 0, role: 'assistant', text: '👋 **Analytics AI** powered by Groq\n\nAsk me anything about your sensor data — I\'ll query PostgreSQL, analyze trends, and generate charts.\n\nTry: *"What is the current temperature trend?"*' }
+  ]);
   const [input, setInput] = useState('');
-  const send = () => { if (!input.trim()) return; sendMessage(input); setInput(''); };
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef(null);
+
+  const BASE = import.meta.env.VITE_API_URL || '';
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
+  const SUGGESTIONS = [
+    'Show me temperature trends',
+    'Is any KPI in critical state?',
+    'Compare energy vs throughput',
+    'What is the average pressure?',
+    'Anomaly detection summary',
+  ];
+
+  const send = async (text) => {
+    const q = (text || input).trim();
+    if (!q || loading) return;
+    setInput('');
+
+    // Add user message
+    const userMsg = { id: Date.now(), role: 'user', text: q };
+    setMessages(prev => [...prev, userMsg]);
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${BASE}/nlq/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q, domain: selectedDomain || 'factory' }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const aiMsg = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        text: data.answer || 'No answer generated.',
+        charts: data.charts || [],
+        model: data.model,
+        dataRows: data.dataRows,
+      };
+      setMessages(prev => [...prev, aiMsg]);
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1, role: 'assistant',
+        text: `❌ **Error:** ${err.message}\n\nMake sure the backend is running (\`docker compose up -d\`).`,
+        charts: [],
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Render a single AI chart ──
+  const renderChart = (chart, idx) => {
+    if (!chart?.data?.length) return null;
+    const ChartType = chart.type === 'bar' ? BarChart : chart.type === 'area' ? AreaChart : LineChart;
+    const DataType  = chart.type === 'bar' ? Bar     : chart.type === 'area' ? Area     : Line;
+
+    return (
+      <div key={idx} style={{ marginTop: '10px', background: 'var(--bg-1)', borderRadius: '10px', padding: '10px', border: '1px solid var(--border)' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          📊 {chart.title || 'Chart'}
+        </div>
+        <ResponsiveContainer width="100%" height={140}>
+          <ChartType data={chart.data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(72,101,242,0.08)" />
+            <XAxis dataKey={chart.xKey || 'x'} tick={{ fontSize: 8, fill: '#94a3b8' }} tickLine={false} />
+            <YAxis tick={{ fontSize: 8, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+            <Tooltip contentStyle={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '10px' }} />
+            {(chart.series || []).map((s, si) => (
+              <DataType
+                key={si}
+                dataKey={s.key}
+                name={s.label || s.key}
+                stroke={s.color || '#4865f2'}
+                fill={chart.type === 'bar' || chart.type === 'area' ? (s.color || '#4865f2') + (chart.type === 'area' ? '40' : '') : undefined}
+                strokeWidth={chart.type !== 'bar' ? 2 : undefined}
+                dot={false}
+                isAnimationActive={false}
+                radius={chart.type === 'bar' ? [3, 3, 0, 0] : undefined}
+              />
+            ))}
+            {(chart.series || []).length > 1 && <Legend iconSize={8} wrapperStyle={{ fontSize: '9px' }} />}
+          </ChartType>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
+
+  // ── Render a message bubble ──
+  const renderMessage = (msg) => {
+    const isUser = msg.role === 'user';
+    return (
+      <div key={msg.id} style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: '4px' }}>
+        <div style={{
+          maxWidth: '92%', padding: isUser ? '8px 12px' : '10px 12px',
+          borderRadius: isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+          background: isUser ? 'var(--accent)' : 'var(--bg-2)',
+          color: isUser ? '#fff' : 'var(--text-0)',
+          fontSize: '12px', lineHeight: 1.55, whiteSpace: 'pre-wrap',
+        }}>
+          {/* Simple markdown bold/italic rendering */}
+          {msg.text.split('\n').map((line, i) => (
+            <div key={i}>
+              {line.replace(/\*\*(.*?)\*\*/g, '⟨b⟩$1⟨/b⟩').replace(/\*(.*?)\*/g, '⟨i⟩$1⟨/i⟩').split(/⟨(\/?\w)⟩/).reduce((acc, part, j) => {
+                if (part === 'b') { acc._bold = true; return acc; }
+                if (part === '/b') { acc._bold = false; return acc; }
+                if (part === 'i') { acc._italic = true; return acc; }
+                if (part === '/i') { acc._italic = false; return acc; }
+                if (part) acc.els.push(
+                  <span key={j} style={{ fontWeight: acc._bold ? 700 : undefined, fontStyle: acc._italic ? 'italic' : undefined }}>{part}</span>
+                );
+                return acc;
+              }, { els: [], _bold: false, _italic: false }).els}
+            </div>
+          ))}
+
+          {/* Charts */}
+          {msg.charts?.map((c, ci) => renderChart(c, ci))}
+
+          {/* Model badge */}
+          {msg.model && (
+            <div style={{ marginTop: '8px', fontSize: '9px', color: isUser ? 'rgba(255,255,255,0.5)' : 'var(--text-2)', display: 'flex', gap: '8px', borderTop: `1px solid ${isUser ? 'rgba(255,255,255,0.15)' : 'var(--border)'}`, paddingTop: '6px' }}>
+              <span>🧠 {msg.model}</span>
+              <span>📊 {msg.dataRows} rows analyzed</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {chatMessages.map(msg => (
-          <div key={msg.id} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-            <div style={{ maxWidth: '85%', padding: '8px 12px', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', background: msg.role === 'user' ? 'var(--accent)' : 'var(--bg-2)', color: msg.role === 'user' ? '#fff' : 'var(--text-0)', fontSize: '12px', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-              {msg.text}
+      {/* Messages */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {messages.map(renderMessage)}
+
+        {/* Loading indicator */}
+        {loading && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{ padding: '10px 14px', borderRadius: '12px 12px 12px 2px', background: 'var(--bg-2)', fontSize: '12px', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ display: 'inline-block', animation: 'pulse-dot 1.2s infinite' }}>●</span>
+              Analyzing with Groq…
             </div>
           </div>
-        ))}
+        )}
+
+        {/* Suggestion chips (only show initially) */}
+        {messages.length <= 1 && !loading && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+            {SUGGESTIONS.map(s => (
+              <button key={s} onClick={() => send(s)}
+                style={{ padding: '5px 10px', borderRadius: '16px', border: '1px solid rgba(72,101,242,0.25)', background: 'rgba(72,101,242,0.06)', color: 'var(--accent)', fontSize: '10px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.15)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.06)'; }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="Ask about KPIs…"
-          style={{ flex: 1, background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-0)', fontSize: '12px', outline: 'none' }} />
-        <button onClick={send} style={{ padding: '8px 14px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Send</button>
+
+      {/* Input */}
+      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', background: 'var(--bg-0)' }}>
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && send()}
+          placeholder={loading ? 'Waiting for response…' : 'Ask about your data…'}
+          disabled={loading}
+          style={{ flex: 1, background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text-0)', fontSize: '12px', outline: 'none', opacity: loading ? 0.6 : 1 }}
+        />
+        <button
+          onClick={() => send()}
+          disabled={loading || !input.trim()}
+          style={{ padding: '8px 14px', borderRadius: '8px', background: loading ? 'var(--bg-2)' : 'var(--accent)', color: loading ? 'var(--text-2)' : '#fff', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 600, transition: 'all 0.2s' }}
+        >
+          {loading ? '⏳' : 'Send'}
+        </button>
       </div>
     </div>
   );
@@ -446,7 +623,7 @@ export default function TwinView() {
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {activePanel === 'kpi'    && <KpiPanel kpis={kpis} components={components} />}
             {activePanel === 'charts' && <ChartsPanel kpis={kpis} kpiHistory={kpiHistory} selectedDomain={selectedDomain} />}
-            {activePanel === 'chat'   && <ChatPanel />}
+            {activePanel === 'chat'   && <ChatPanel selectedDomain={selectedDomain} />}
           </div>
         </div>
       </div>

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 from db.connection import get_pool, close_pool
-from routers import source, layout, kpis
+from routers import source, layout, kpis, nlq
 from ws.kpi_stream import kpi_ws_handler
 from simulator.data_gen import run_simulator
 
@@ -49,6 +49,7 @@ app.add_middleware(
 app.include_router(source.router)
 app.include_router(layout.router)
 app.include_router(kpis.router)
+app.include_router(nlq.router)
 
 
 # ── Health check ──────────────────────────────────────────────

@@ -11,6 +11,7 @@ export default defineConfig({
       '/source': 'http://localhost:8000',
       '/analytics': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
+      '/nlq':    'http://localhost:8000',
       '/ws':     { target: 'ws://localhost:8000', ws: true },
     },
   },

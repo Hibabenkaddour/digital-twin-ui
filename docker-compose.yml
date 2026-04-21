@@ -24,6 +24,8 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://dt2_user:dt2_pass@db:5432/dt2_db
+    env_file:
+      - ./backend/.env
     depends_on:
       db:
         condition: service_healthy
