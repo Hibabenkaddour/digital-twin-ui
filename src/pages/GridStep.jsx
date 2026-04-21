@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import useTwinStore, { DOMAINS } from '../store/useTwinStore';
 import Grid2D from '../components/Grid2D';
 import Scene3D from '../components/Scene3D';
-import { layoutPrompt, saveLayoutState, checkBackendHealth } from '../services/api';
+import { layoutPrompt, checkBackendHealth } from '../services/api';
 
 const VIEWS = ['2D Grid', '3D Preview', 'Split'];
 
