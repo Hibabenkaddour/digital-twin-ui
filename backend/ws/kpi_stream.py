@@ -28,7 +28,12 @@ DOMAIN_COLUMNS = {
 def _safe_eval(formula: str, row: dict) -> float:
     """Evaluate a formula string against a row dict using numexpr."""
     try:
-        local_vars = {k: float(v) for k, v in row.items() if v is not None}
+        local_vars = {}
+        for k, v in row.items():
+            try:
+                local_vars[k] = float(v)
+            except (ValueError, TypeError):
+                pass  # skip non-numeric fields (e.g. flow_status, recorded_at)
         result = numexpr.evaluate(formula, local_dict=local_vars)
         return float(numpy.atleast_1d(result)[0])
     except Exception:
