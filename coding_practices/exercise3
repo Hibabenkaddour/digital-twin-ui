@@ -1,0 +1,29 @@
+#"counting" problem
+
+'''The Challenge: Majority Element
+The Goal:
+Given a list of numbers nums, find the element that appears more than half the time. You can assume that the majority element always exists in the list.
+
+Example:
+
+Input: nums = [3, 2, 3]
+
+Output: 3
+(Why? There are 3 numbers total. The number 3 appears twice, which is more than half.)'''
+
+
+def majority_element (nums):
+    dictionary = {}
+    treshold = len(nums) // 2
+    for n in nums:
+        if n in dictionary:
+            dictionary[n] +=1
+        else:
+            dictionary[n]= 1
+        if dictionary[n]> treshold:
+            return n
+    return -1
+
+# Test it
+print(majority_element([3, 2, 3])) # Should print 3
+print(majority_element([2, 2, 1, 1, 1, 2, 2])) # Should print 2

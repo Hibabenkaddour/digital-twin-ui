@@ -6,6 +6,17 @@ import useTwinStore, { DOMAINS } from '../store/useTwinStore';
 
 const STATUS_COLORS = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
 
+// Height (in world units) between floor levels.
+// Components max out at ~8 units tall + we add 6 units clearance.
+const FLOOR_HEIGHT = 14;
+
+// Per-floor accent colours for the slab border + label
+const FLOOR_ACCENT = [
+    '#4865f2', '#10b981', '#f59e0b', '#ef4444',
+    '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
+    '#84cc16', '#64748b',
+];
+
 // ─── Domain-Specific Shape Libraries ─────────────────────────────────────────
 function ShapeTerminal({ w, d, h, color }) {
     return (
@@ -14,19 +25,16 @@ function ShapeTerminal({ w, d, h, color }) {
                 <boxGeometry args={[w * 0.95, h * 0.7, d * 0.95]} />
                 <meshStandardMaterial color={color} roughness={0.3} metalness={0.4} />
             </mesh>
-            {/* Roof overhang */}
             <mesh position={[0, h * 0.74, 0]} castShadow>
                 <boxGeometry args={[w, h * 0.08, d]} />
                 <meshStandardMaterial color={color} roughness={0.2} metalness={0.6} />
             </mesh>
-            {/* Glass facade strips */}
             {[-0.3, 0, 0.3].map((offset, i) => (
                 <mesh key={i} position={[offset * w * 0.6, h * 0.3, d * 0.48]} castShadow>
                     <boxGeometry args={[w * 0.18, h * 0.5, 0.15]} />
                     <meshStandardMaterial color="#6ab4f5" roughness={0.05} metalness={0.9} transparent opacity={0.7} />
                 </mesh>
             ))}
-            {/* Columns */}
             {[[-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45]].map(([cx, cz], i) => (
                 <mesh key={i} position={[cx * w, h * 0.35, cz * d]} castShadow>
                     <cylinderGeometry args={[0.25, 0.25, h * 0.7, 8]} />
@@ -40,22 +48,18 @@ function ShapeTerminal({ w, d, h, color }) {
 function ShapeGate({ w, d, h, color }) {
     return (
         <group>
-            {/* Main building */}
             <mesh position={[0, h * 0.4, 0]} castShadow>
                 <boxGeometry args={[w * 0.55, h * 0.8, d * 0.9]} />
                 <meshStandardMaterial color={color} roughness={0.3} metalness={0.4} />
             </mesh>
-            {/* Jetway tube */}
             <mesh position={[w * 0.3, h * 0.38, 0]} rotation={[0, 0, 0]} castShadow>
                 <cylinderGeometry args={[0.3, 0.3, w * 0.6, 10]} rotation={[0, 0, Math.PI / 2]} />
                 <meshStandardMaterial color="#7a8fa6" roughness={0.4} metalness={0.5} />
             </mesh>
-            {/* Jetway end connector */}
             <mesh position={[w * 0.6, h * 0.38, 0]} castShadow>
                 <sphereGeometry args={[0.4, 12, 12]} />
                 <meshStandardMaterial color="#4e6a80" roughness={0.3} metalness={0.6} />
             </mesh>
-            {/* Number sign */}
             <mesh position={[0, h * 0.88, 0]} castShadow>
                 <boxGeometry args={[0.8, 0.4, 0.1]} />
                 <meshStandardMaterial color="#1e3a5f" roughness={0.5} />
@@ -67,19 +71,16 @@ function ShapeGate({ w, d, h, color }) {
 function ShapeRunway({ w, d, h, color }) {
     return (
         <group>
-            {/* Main asphalt */}
             <mesh position={[0, h * 0.15, 0]} castShadow>
                 <boxGeometry args={[w * 0.98, h * 0.3, d * 0.98]} />
                 <meshStandardMaterial color="#1a1f2e" roughness={0.95} metalness={0.05} />
             </mesh>
-            {/* Center line dashes */}
             {Array.from({ length: 6 }).map((_, i) => (
                 <mesh key={i} position={[(i - 2.5) * (w / 6.5), h * 0.31, 0]} castShadow>
                     <boxGeometry args={[w * 0.07, 0.05, 0.25]} />
                     <meshStandardMaterial color="#f0f0cc" roughness={0.8} />
                 </mesh>
             ))}
-            {/* Edge lights */}
             {[-0.48, 0.48].map((side, j) =>
                 Array.from({ length: 5 }).map((_, i) => (
                     <mesh key={`${j}-${i}`} position={[(i - 2) * (w / 5), h * 0.32, side * d]}>
@@ -95,17 +96,14 @@ function ShapeRunway({ w, d, h, color }) {
 function ShapeCheckinDesk({ w, d, h, color }) {
     return (
         <group>
-            {/* Counter */}
             <mesh position={[0, h * 0.38, 0]} castShadow>
                 <boxGeometry args={[w * 0.95, h * 0.75, d * 0.5]} />
                 <meshStandardMaterial color={color} roughness={0.4} metalness={0.2} />
             </mesh>
-            {/* Top counter lip */}
             <mesh position={[0, h * 0.77, d * 0.1]} castShadow>
                 <boxGeometry args={[w * 0.97, 0.1, d * 0.7]} />
                 <meshStandardMaterial color="#cbd5e1" roughness={0.3} metalness={0.5} />
             </mesh>
-            {/* Monitor screens */}
             {[-0.3, 0, 0.3].map((ox, i) => (
                 <mesh key={i} position={[ox * w, h * 1.05, d * 0.05]} castShadow>
                     <boxGeometry args={[0.4, 0.3, 0.06]} />
@@ -119,27 +117,22 @@ function ShapeCheckinDesk({ w, d, h, color }) {
 function ShapeSecurityZone({ w, d, h, color }) {
     return (
         <group>
-            {/* Floor platform */}
             <mesh position={[0, h * 0.1, 0]} castShadow>
                 <boxGeometry args={[w * 0.95, h * 0.2, d * 0.95]} />
                 <meshStandardMaterial color="#2d3748" roughness={0.8} metalness={0.1} />
             </mesh>
-            {/* Detector arch - left pillar */}
             <mesh position={[-w * 0.18, h * 0.55, 0]} castShadow>
                 <boxGeometry args={[0.25, h * 0.9, 0.25]} />
                 <meshStandardMaterial color={color} roughness={0.3} metalness={0.5} />
             </mesh>
-            {/* Detector arch - right pillar */}
             <mesh position={[w * 0.18, h * 0.55, 0]} castShadow>
                 <boxGeometry args={[0.25, h * 0.9, 0.25]} />
                 <meshStandardMaterial color={color} roughness={0.3} metalness={0.5} />
             </mesh>
-            {/* Detector arch - top beam */}
             <mesh position={[0, h, 0]} castShadow>
                 <boxGeometry args={[w * 0.38, 0.22, 0.22]} />
                 <meshStandardMaterial color={color} roughness={0.2} metalness={0.7} />
             </mesh>
-            {/* X-ray belt */}
             <mesh position={[w * 0.35, h * 0.2, 0]} castShadow>
                 <boxGeometry args={[w * 0.4, 0.25, d * 0.35]} />
                 <meshStandardMaterial color="#1a2035" roughness={0.6} metalness={0.3} />
@@ -151,17 +144,14 @@ function ShapeSecurityZone({ w, d, h, color }) {
 function ShapeBaggageClaim({ w, d, h, color }) {
     return (
         <group>
-            {/* Base ring/platform */}
             <mesh position={[0, h * 0.1, 0]} castShadow>
                 <cylinderGeometry args={[Math.min(w, d) * 0.48, Math.min(w, d) * 0.5, h * 0.2, 32]} />
                 <meshStandardMaterial color="#374151" roughness={0.8} metalness={0.2} />
             </mesh>
-            {/* Carousel belt ring */}
             <mesh position={[0, h * 0.28, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
                 <torusGeometry args={[Math.min(w, d) * 0.36, 0.3, 8, 32]} />
                 <meshStandardMaterial color={color} roughness={0.3} metalness={0.6} />
             </mesh>
-            {/* Baggage items */}
             {[0, Math.PI * 0.6, Math.PI * 1.2].map((angle, i) => (
                 <mesh key={i} position={[Math.cos(angle) * Math.min(w, d) * 0.36, h * 0.42, Math.sin(angle) * Math.min(w, d) * 0.36]} castShadow>
                     <boxGeometry args={[0.45, 0.3, 0.3]} />
@@ -175,29 +165,24 @@ function ShapeBaggageClaim({ w, d, h, color }) {
 function ShapeHydraulicPress({ w, d, h, color }) {
     return (
         <group>
-            {/* Heavy base */}
             <mesh position={[0, h * 0.18, 0]} castShadow>
                 <boxGeometry args={[w * 0.9, h * 0.36, d * 0.9]} />
                 <meshStandardMaterial color="#374151" roughness={0.4} metalness={0.6} />
             </mesh>
-            {/* Frame uprights */}
             {[-0.36, 0.36].map((ox, i) => (
                 <mesh key={i} position={[ox * w, h * 0.6, 0]} castShadow>
                     <boxGeometry args={[0.3, h * 0.9, 0.3]} />
                     <meshStandardMaterial color="#4b5563" roughness={0.3} metalness={0.7} />
                 </mesh>
             ))}
-            {/* Top crossbeam */}
             <mesh position={[0, h * 1.07, 0]} castShadow>
                 <boxGeometry args={[w * 0.78, 0.35, 0.35]} />
                 <meshStandardMaterial color="#4b5563" roughness={0.3} metalness={0.7} />
             </mesh>
-            {/* Hydraulic cylinder */}
             <mesh position={[0, h * 0.82, 0]} castShadow>
                 <cylinderGeometry args={[0.28, 0.28, h * 0.5, 16]} />
                 <meshStandardMaterial color={color} roughness={0.2} metalness={0.8} />
             </mesh>
-            {/* Press plate */}
             <mesh position={[0, h * 0.5, 0]} castShadow>
                 <boxGeometry args={[w * 0.65, 0.2, d * 0.65]} />
                 <meshStandardMaterial color="#6b7280" roughness={0.4} metalness={0.5} />
@@ -209,24 +194,20 @@ function ShapeHydraulicPress({ w, d, h, color }) {
 function ShapeConveyor({ w, d, h, color }) {
     return (
         <group>
-            {/* Belt surface */}
             <mesh position={[0, h * 0.3, 0]} castShadow>
                 <boxGeometry args={[w * 0.96, h * 0.6, d * 0.6]} />
                 <meshStandardMaterial color="#1f2937" roughness={0.8} metalness={0.1} />
             </mesh>
-            {/* Belt surface top */}
             <mesh position={[0, h * 0.62, 0]} castShadow>
                 <boxGeometry args={[w * 0.96, 0.08, d * 0.58]} />
                 <meshStandardMaterial color={color} roughness={0.7} metalness={0.2} />
             </mesh>
-            {/* Roller drums at ends */}
             {[-0.46, 0.46].map((ox, i) => (
                 <mesh key={i} position={[ox * w, h * 0.3, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
                     <cylinderGeometry args={[d * 0.3, d * 0.3, d * 0.7, 16]} />
                     <meshStandardMaterial color={color} roughness={0.3} metalness={0.7} />
                 </mesh>
             ))}
-            {/* Side frames */}
             {[-0.32, 0.32].map((oz, i) => (
                 <mesh key={i} position={[0, h * 0.3, oz * d]} castShadow>
                     <boxGeometry args={[w * 0.95, 0.1, 0.1]} />
@@ -240,22 +221,18 @@ function ShapeConveyor({ w, d, h, color }) {
 function ShapeCncMachine({ w, d, h, color }) {
     return (
         <group>
-            {/* Main body */}
             <mesh position={[0, h * 0.38, 0]} castShadow>
                 <boxGeometry args={[w * 0.85, h * 0.75, d * 0.85]} />
                 <meshStandardMaterial color={color} roughness={0.3} metalness={0.5} />
             </mesh>
-            {/* Spindle post */}
             <mesh position={[0, h * 0.84, 0]} castShadow>
                 <cylinderGeometry args={[0.22, 0.22, h * 0.35, 12]} />
                 <meshStandardMaterial color="#9ca3af" roughness={0.2} metalness={0.9} />
             </mesh>
-            {/* Tool head */}
             <mesh position={[0, h * 0.6, 0]} castShadow>
                 <coneGeometry args={[0.28, 0.5, 8]} />
                 <meshStandardMaterial color="#d1d5db" roughness={0.15} metalness={0.95} />
             </mesh>
-            {/* Control panel */}
             <mesh position={[w * 0.44, h * 0.55, 0]} castShadow>
                 <boxGeometry args={[0.12, 0.5, 0.6]} />
                 <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.3} emissive="#0f2040" emissiveIntensity={0.4} />
@@ -267,27 +244,23 @@ function ShapeCncMachine({ w, d, h, color }) {
 function ShapeAssemblyStation({ w, d, h, color }) {
     return (
         <group>
-            {/* Worktable top */}
             <mesh position={[0, h * 0.55, 0]} castShadow>
                 <boxGeometry args={[w * 0.9, 0.15, d * 0.9]} />
                 <meshStandardMaterial color="#e2e8f0" roughness={0.3} metalness={0.3} />
             </mesh>
-            {/* Table legs */}
             {[[-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]].map(([lx, lz], i) => (
                 <mesh key={i} position={[lx * w, h * 0.27, lz * d]} castShadow>
-                    <boxGeometry args={[0.15, h * 0.54, 0.15]} />
-                    <meshStandardMaterial color="#6b7280" roughness={0.5} metalness={0.4} />
+                    <boxGeometry args={[0.18, h * 0.54, 0.18]} />
+                    <meshStandardMaterial color="#64748b" roughness={0.4} metalness={0.4} />
                 </mesh>
             ))}
-            {/* Work piece */}
-            <mesh position={[0, h * 0.66, 0]} castShadow>
-                <boxGeometry args={[w * 0.35, 0.2, d * 0.35]} />
-                <meshStandardMaterial color={color} roughness={0.4} metalness={0.3} />
+            <mesh position={[w * 0.25, h * 0.7, 0]} castShadow>
+                <boxGeometry args={[0.12, h * 0.4, 0.12]} />
+                <meshStandardMaterial color={color} roughness={0.3} metalness={0.6} />
             </mesh>
-            {/* Tool arm */}
-            <mesh position={[w * 0.2, h * 0.8, 0]} castShadow>
-                <cylinderGeometry args={[0.08, 0.08, h * 0.5, 8]} />
-                <meshStandardMaterial color="#374151" roughness={0.4} metalness={0.6} />
+            <mesh position={[w * 0.25, h * 0.9, d * 0.25]} castShadow>
+                <sphereGeometry args={[0.22, 10, 10]} />
+                <meshStandardMaterial color={color} roughness={0.2} metalness={0.8} emissive={color} emissiveIntensity={0.2} />
             </mesh>
         </group>
     );
@@ -296,25 +269,23 @@ function ShapeAssemblyStation({ w, d, h, color }) {
 function ShapeQualityControl({ w, d, h, color }) {
     return (
         <group>
-            {/* Scan table */}
-            <mesh position={[0, h * 0.2, 0]} castShadow>
-                <boxGeometry args={[w * 0.9, h * 0.4, d * 0.9]} />
-                <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.4} />
+            <mesh position={[0, h * 0.3, 0]} castShadow>
+                <boxGeometry args={[w * 0.9, h * 0.6, d * 0.9]} />
+                <meshStandardMaterial color={color} roughness={0.3} metalness={0.4} />
             </mesh>
-            {/* Scanner surface */}
-            <mesh position={[0, h * 0.42, 0]} castShadow>
-                <boxGeometry args={[w * 0.88, 0.08, d * 0.88]} />
-                <meshStandardMaterial color="#0d9488" roughness={0.1} metalness={0.8} emissive="#0d9488" emissiveIntensity={0.2} />
+            <mesh position={[0, h * 0.64, 0]} castShadow>
+                <cylinderGeometry args={[Math.min(w, d) * 0.22, Math.min(w, d) * 0.22, h * 0.08, 24]} />
+                <meshStandardMaterial color="#d1d5db" roughness={0.2} metalness={0.8} />
             </mesh>
-            {/* Sensor post */}
-            <mesh position={[0, h * 0.8, 0]} castShadow>
-                <cylinderGeometry args={[0.15, 0.15, h * 0.8, 8]} />
-                <meshStandardMaterial color="#374151" roughness={0.3} metalness={0.7} />
-            </mesh>
-            {/* Status light */}
-            <mesh position={[0, h * 1.22, 0]} castShadow>
-                <sphereGeometry args={[0.2, 12, 12]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} />
+            {[0, Math.PI / 2].map((ang, i) => (
+                <mesh key={i} position={[Math.cos(ang) * w * 0.28, h * 0.72, Math.sin(ang) * d * 0.28]} castShadow>
+                    <boxGeometry args={[0.12, h * 0.08, 0.12]} />
+                    <meshStandardMaterial color="#94a3b8" roughness={0.4} metalness={0.5} />
+                </mesh>
+            ))}
+            <mesh position={[w * 0.3, h * 0.5, 0]} castShadow>
+                <boxGeometry args={[0.1, 0.35, 0.5]} />
+                <meshStandardMaterial color="#0f172a" roughness={0.3} metalness={0.5} emissive="#1e3a5f" emissiveIntensity={0.5} />
             </mesh>
         </group>
     );
@@ -323,25 +294,22 @@ function ShapeQualityControl({ w, d, h, color }) {
 function ShapeWarehouseRack({ w, d, h, color }) {
     return (
         <group>
-            {/* Upright frames */}
-            {[-0.46, 0.46].map((ox, i) => (
+            {[-0.44, 0.44].map((ox, i) => (
                 <mesh key={i} position={[ox * w, h * 0.5, 0]} castShadow>
-                    <boxGeometry args={[0.18, h, d * 0.9]} />
+                    <boxGeometry args={[0.18, h, 0.18]} />
                     <meshStandardMaterial color="#374151" roughness={0.5} metalness={0.5} />
                 </mesh>
             ))}
-            {/* Shelves */}
-            {[0.15, 0.42, 0.7, 0.95].map((fy, i) => (
+            {[0.15, 0.45, 0.75].map((fy, i) => (
                 <mesh key={i} position={[0, h * fy, 0]} castShadow>
-                    <boxGeometry args={[w * 0.88, 0.1, d * 0.85]} />
-                    <meshStandardMaterial color={i % 2 === 0 ? '#4b5563' : '#374151'} roughness={0.5} metalness={0.4} />
+                    <boxGeometry args={[w * 0.92, 0.12, d * 0.9]} />
+                    <meshStandardMaterial color="#4b5563" roughness={0.5} metalness={0.4} />
                 </mesh>
             ))}
-            {/* Items on shelves */}
-            {[0.27, 0.55, 0.82].map((fy, i) => (
-                <mesh key={i} position={[(i - 1) * w * 0.22, h * fy, 0]} castShadow>
-                    <boxGeometry args={[w * 0.2, h * 0.12, d * 0.6]} />
-                    <meshStandardMaterial color={color} roughness={0.6} metalness={0.1} />
+            {[0.28, 0.58].map((fy, i) => (
+                <mesh key={i} position={[w * 0.1, h * fy, 0]} castShadow>
+                    <boxGeometry args={[w * 0.55, 0.1, d * 0.55]} />
+                    <meshStandardMaterial color={color} roughness={0.6} metalness={0.2} />
                 </mesh>
             ))}
         </group>
@@ -351,26 +319,23 @@ function ShapeWarehouseRack({ w, d, h, color }) {
 function ShapePickingZone({ w, d, h, color }) {
     return (
         <group>
-            {/* Marked floor zone */}
-            <mesh position={[0, h * 0.07, 0]} castShadow>
-                <boxGeometry args={[w * 0.97, h * 0.14, d * 0.97]} />
-                <meshStandardMaterial color="#1a1f2e" roughness={0.9} metalness={0.05} />
+            <mesh position={[0, h * 0.12, 0]} receiveShadow>
+                <boxGeometry args={[w * 0.95, h * 0.24, d * 0.95]} />
+                <meshStandardMaterial color="#e2e8f0" roughness={0.7} metalness={0.05} />
             </mesh>
-            {/* Zone lines */}
-            {[[-w * 0.48, 0, 0, h * 0.15, w * 0.97 * 0.05, d * 0.97]].map((_, i) => null)}
-            <mesh position={[0, h * 0.15, w * 0.47]} castShadow>
-                <boxGeometry args={[d * 0.97, 0.06, 0.1]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} roughness={0.6} />
+            <mesh position={[-w * 0.2, h * 0.58, 0]} castShadow>
+                <boxGeometry args={[w * 0.25, h * 0.7, 0.35]} />
+                <meshStandardMaterial color={color} roughness={0.3} metalness={0.5} />
             </mesh>
-            {/* Small forklift shape */}
-            <mesh position={[w * 0.18, h * 0.35, d * 0.1]} castShadow>
-                <boxGeometry args={[0.6, 0.5, 0.8]} />
-                <meshStandardMaterial color="#f59e0b" roughness={0.5} metalness={0.3} />
-            </mesh>
-            {/* Forklift forks */}
-            <mesh position={[w * 0.18, h * 0.22, d * 0.5]} castShadow>
-                <boxGeometry args={[0.7, 0.08, 0.45]} />
-                <meshStandardMaterial color="#9ca3af" roughness={0.4} metalness={0.6} />
+            {[0.05, 0.3, 0.55].map((fy, i) => (
+                <mesh key={i} position={[-w * 0.2, h * (0.27 + fy * 0.5), 0.2]} castShadow>
+                    <boxGeometry args={[w * 0.22, 0.08, 0.3]} />
+                    <meshStandardMaterial color="#94a3b8" roughness={0.5} metalness={0.3} />
+                </mesh>
+            ))}
+            <mesh position={[w * 0.2, h * 0.3, 0]} castShadow rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.28, 0.35, w * 0.35, 8]} />
+                <meshStandardMaterial color="#f59e0b" roughness={0.4} metalness={0.4} />
             </mesh>
         </group>
     );
@@ -379,41 +344,14 @@ function ShapePickingZone({ w, d, h, color }) {
 function ShapeReceptionDock({ w, d, h, color }) {
     return (
         <group>
-            {/* Building */}
-            <mesh position={[0, h * 0.4, -d * 0.15]} castShadow>
-                <boxGeometry args={[w * 0.94, h * 0.8, d * 0.65]} />
-                <meshStandardMaterial color={color} roughness={0.4} metalness={0.3} />
+            <mesh position={[0, h * 0.15, 0]} castShadow>
+                <boxGeometry args={[w * 0.96, h * 0.3, d * 0.96]} />
+                <meshStandardMaterial color="#475569" roughness={0.7} metalness={0.2} />
             </mesh>
-            {/* Loading ramp */}
-            <mesh position={[0, h * 0.06, d * 0.3]} rotation={[0.25, 0, 0]} castShadow>
-                <boxGeometry args={[w * 0.7, 0.12, d * 0.4]} />
-                <meshStandardMaterial color="#374151" roughness={0.8} metalness={0.2} />
+            <mesh position={[0, h * 0.32, -d * 0.38]} castShadow>
+                <boxGeometry args={[w * 0.9, h * 0.06, 0.18]} />
+                <meshStandardMaterial color="#1e40af" roughness={0.5} metalness={0.4} />
             </mesh>
-            {/* Door opening */}
-            <mesh position={[0, h * 0.3, -d * 0.16 + d * 0.325 + 0.05]}>
-                <boxGeometry args={[w * 0.4, h * 0.5, 0.08]} />
-                <meshStandardMaterial color="#0d1117" roughness={0.9} />
-            </mesh>
-        </group>
-    );
-}
-
-function ShapeShippingDock({ w, d, h, color }) {
-    return (
-        <group>
-            {/* Main building */}
-            <mesh position={[0, h * 0.4, 0]} castShadow>
-                <boxGeometry args={[w * 0.94, h * 0.8, d * 0.94]} />
-                <meshStandardMaterial color={color} roughness={0.4} metalness={0.3} />
-            </mesh>
-            {/* Loading doors */}
-            {[-0.28, 0, 0.28].map((ox, i) => (
-                <mesh key={i} position={[ox * w, h * 0.28, d * 0.48]}>
-                    <boxGeometry args={[w * 0.2, h * 0.45, 0.1]} />
-                    <meshStandardMaterial color="#0f172a" roughness={0.6} />
-                </mesh>
-            ))}
-            {/* Dock bumpers */}
             {[-0.28, 0, 0.28].map((ox, i) => (
                 <mesh key={i} position={[ox * w, h * 0.06, d * 0.49]} castShadow>
                     <boxGeometry args={[w * 0.17, 0.18, 0.2]} />
@@ -424,20 +362,38 @@ function ShapeShippingDock({ w, d, h, color }) {
     );
 }
 
+function ShapeShippingDock({ w, d, h, color }) {
+    return (
+        <group>
+            <mesh position={[0, h * 0.15, 0]} castShadow>
+                <boxGeometry args={[w * 0.96, h * 0.3, d * 0.96]} />
+                <meshStandardMaterial color="#475569" roughness={0.7} metalness={0.2} />
+            </mesh>
+            <mesh position={[0, h * 0.32, -d * 0.38]} castShadow>
+                <boxGeometry args={[w * 0.9, h * 0.06, 0.18]} />
+                <meshStandardMaterial color="#16a34a" roughness={0.5} metalness={0.4} />
+            </mesh>
+            {[-0.28, 0, 0.28].map((ox, i) => (
+                <mesh key={i} position={[ox * w, h * 0.06, d * 0.49]} castShadow>
+                    <boxGeometry args={[w * 0.17, 0.18, 0.2]} />
+                    <meshStandardMaterial color="#15803d" roughness={0.7} metalness={0.1} />
+                </mesh>
+            ))}
+        </group>
+    );
+}
+
 function ShapeSorter({ w, d, h, color }) {
     return (
         <group>
-            {/* Platform */}
             <mesh position={[0, h * 0.15, 0]} castShadow>
                 <cylinderGeometry args={[Math.min(w, d) * 0.42, Math.min(w, d) * 0.45, h * 0.3, 20]} />
                 <meshStandardMaterial color="#374151" roughness={0.5} metalness={0.4} />
             </mesh>
-            {/* Cone sorter */}
             <mesh position={[0, h * 0.55, 0]} castShadow>
                 <coneGeometry args={[Math.min(w, d) * 0.3, h * 0.7, 16]} />
                 <meshStandardMaterial color={color} roughness={0.3} metalness={0.5} />
             </mesh>
-            {/* Spinning arms */}
             {[0, Math.PI * 0.67, Math.PI * 1.33].map((angle, i) => (
                 <mesh key={i} position={[Math.cos(angle) * Math.min(w, d) * 0.32, h * 0.35, Math.sin(angle) * Math.min(w, d) * 0.32]} castShadow>
                     <boxGeometry args={[0.15, 0.12, Math.min(w, d) * 0.28]} />
@@ -449,12 +405,6 @@ function ShapeSorter({ w, d, h, color }) {
 }
 
 // ─── Universal AI-Generated Shape Renderer ────────────────────────────────────
-// Renders ANY object from a `mesh3D.parts` array generated by the LLM.
-// Each part: { geo, pos, size, rot, color, metalness, roughness, emissive, opacity }
-// geo: "box" | "cylinder" | "sphere" | "cone" | "torus"
-// pos: [x, y, z] as fractions of w, h, d (e.g. [0, 0.5, 0] = center height)
-// size: geometry args as fractions, scaled by w/h/d automatically
-// rot: [rx, ry, rz] in degrees
 function PartMesh({ part, w, h, d, fallbackColor }) {
     const pos = part.pos || [0, 0, 0];
     const rot = part.rot || [0, 0, 0];
@@ -467,30 +417,13 @@ function PartMesh({ part, w, h, d, fallbackColor }) {
     const geo = part.geo || 'box';
     const s = part.size || [0.5, 0.5, 0.5];
 
-    // Scale sizes relative to component dimensions
     let geoArgs;
     switch (geo) {
-        case 'cylinder':
-            // size: [radiusTop, radiusBottom, height, segments]
-            geoArgs = [s[0] * Math.min(w, d), (s[1] ?? s[0]) * Math.min(w, d), (s[2] ?? 0.5) * h, s[3] ?? 16];
-            break;
-        case 'sphere':
-            // size: [radius, widthSeg, heightSeg]
-            geoArgs = [s[0] * Math.min(w, d), s[1] ?? 24, s[2] ?? 24];
-            break;
-        case 'cone':
-            // size: [radius, height, segments]
-            geoArgs = [s[0] * Math.min(w, d), (s[1] ?? 0.5) * h, s[2] ?? 16];
-            break;
-        case 'torus':
-            // size: [radius, tube, radialSeg, tubularSeg]
-            geoArgs = [s[0] * Math.min(w, d), (s[1] ?? 0.05) * Math.min(w, d), s[2] ?? 8, s[3] ?? 24];
-            break;
-        case 'box':
-        default:
-            // size: [width, height, depth] as fractions of w, h, d
-            geoArgs = [s[0] * w, (s[1] ?? s[0]) * h, (s[2] ?? s[0]) * d];
-            break;
+        case 'cylinder': geoArgs = [s[0] * Math.min(w, d), (s[1] ?? s[0]) * Math.min(w, d), (s[2] ?? 0.5) * h, s[3] ?? 16]; break;
+        case 'sphere':   geoArgs = [s[0] * Math.min(w, d), s[1] ?? 24, s[2] ?? 24]; break;
+        case 'cone':     geoArgs = [s[0] * Math.min(w, d), (s[1] ?? 0.5) * h, s[2] ?? 16]; break;
+        case 'torus':    geoArgs = [s[0] * Math.min(w, d), (s[1] ?? 0.05) * Math.min(w, d), s[2] ?? 8, s[3] ?? 24]; break;
+        default:         geoArgs = [s[0] * w, (s[1] ?? s[0]) * h, (s[2] ?? s[0]) * d]; break;
     }
 
     const geoElement = (() => {
@@ -504,19 +437,11 @@ function PartMesh({ part, w, h, d, fallbackColor }) {
     })();
 
     return (
-        <mesh
-            position={[pos[0] * w, pos[1] * h, pos[2] * d]}
-            rotation={rot.map(r => r * Math.PI / 180)}
-            castShadow
-        >
+        <mesh position={[pos[0] * w, pos[1] * h, pos[2] * d]} rotation={rot.map(r => r * Math.PI / 180)} castShadow>
             {geoElement}
-            <meshStandardMaterial
-                color={clr}
-                roughness={rough}
-                metalness={metal}
+            <meshStandardMaterial color={clr} roughness={rough} metalness={metal}
                 {...(emClr ? { emissive: emClr, emissiveIntensity: emInt } : {})}
-                {...(op < 1 ? { transparent: true, opacity: op } : {})}
-            />
+                {...(op < 1 ? { transparent: true, opacity: op } : {})} />
         </mesh>
     );
 }
@@ -524,19 +449,9 @@ function PartMesh({ part, w, h, d, fallbackColor }) {
 function ShapeCustom({ w, d, h, color, mesh3D }) {
     const m = mesh3D || {};
     const parts = m.parts;
-
-    // ── Parts-based universal renderer ──
     if (parts && Array.isArray(parts) && parts.length > 0) {
-        return (
-            <group>
-                {parts.map((part, i) => (
-                    <PartMesh key={i} part={part} w={w} h={h} d={d} fallbackColor={color} />
-                ))}
-            </group>
-        );
+        return <group>{parts.map((part, i) => <PartMesh key={i} part={part} w={w} h={h} d={d} fallbackColor={color} />)}</group>;
     }
-
-    // ── Legacy fallback: simple box ──
     return (
         <group>
             <mesh position={[0, h * 0.45, 0]} castShadow>
@@ -554,29 +469,26 @@ function ShapeCustom({ w, d, h, color, mesh3D }) {
 // ─── Shape Dispatcher ─────────────────────────────────────────────────────────
 function DomainShape({ type, w, d, h, color, mesh3D }) {
     const props = { w, d, h, color };
-    // Custom AI-generated components — type starts with "custom_"
-    if (type?.startsWith('custom_')) {
-        return <ShapeCustom {...props} mesh3D={mesh3D} />;
-    }
+    if (type?.startsWith('custom_')) return <ShapeCustom {...props} mesh3D={mesh3D} />;
     switch (type) {
-        case 'terminal': return <ShapeTerminal {...props} />;
-        case 'gate': return <ShapeGate {...props} />;
-        case 'runway': return <ShapeRunway {...props} />;
-        case 'checkin_desk': return <ShapeCheckinDesk {...props} />;
-        case 'security_zone': return <ShapeSecurityZone {...props} />;
-        case 'baggage_claim': return <ShapeBaggageClaim {...props} />;
+        case 'terminal':        return <ShapeTerminal {...props} />;
+        case 'gate':            return <ShapeGate {...props} />;
+        case 'runway':          return <ShapeRunway {...props} />;
+        case 'checkin_desk':    return <ShapeCheckinDesk {...props} />;
+        case 'security_zone':   return <ShapeSecurityZone {...props} />;
+        case 'baggage_claim':   return <ShapeBaggageClaim {...props} />;
         case 'hydraulic_press': return <ShapeHydraulicPress {...props} />;
         case 'conveyor_belt':
-        case 'conveyor': return <ShapeConveyor {...props} />;
-        case 'cnc_machine': return <ShapeCncMachine {...props} />;
+        case 'conveyor':        return <ShapeConveyor {...props} />;
+        case 'cnc_machine':     return <ShapeCncMachine {...props} />;
         case 'assembly_station': return <ShapeAssemblyStation {...props} />;
         case 'quality_control': return <ShapeQualityControl {...props} />;
         case 'warehouse_rack':
-        case 'storage_rack': return <ShapeWarehouseRack {...props} />;
-        case 'picking_zone': return <ShapePickingZone {...props} />;
-        case 'reception_dock': return <ShapeReceptionDock {...props} />;
-        case 'shipping_dock': return <ShapeShippingDock {...props} />;
-        case 'sorter': return <ShapeSorter {...props} />;
+        case 'storage_rack':    return <ShapeWarehouseRack {...props} />;
+        case 'picking_zone':    return <ShapePickingZone {...props} />;
+        case 'reception_dock':  return <ShapeReceptionDock {...props} />;
+        case 'shipping_dock':   return <ShapeShippingDock {...props} />;
+        case 'sorter':          return <ShapeSorter {...props} />;
         default:
             return (
                 <mesh position={[0, h / 2, 0]} castShadow>
@@ -587,9 +499,10 @@ function DomainShape({ type, w, d, h, color, mesh3D }) {
     }
 }
 
-// ─── Draggable Component Mesh ─────────────────────────────────────────────────
+// ─── Component Mesh (floor-aware) ─────────────────────────────────────────────
 function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect, onHover, onMove }) {
     const [cw, ch] = component.gridSize;
+    const floorY = (component.floor ?? 0) * FLOOR_HEIGHT;
     const worldX = component.col * cellSize + (cw * cellSize) / 2;
     const worldZ = component.row * cellSize + (ch * cellSize) / 2;
     const isRotated = (component.rotation || 0) % 180 !== 0;
@@ -603,14 +516,14 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
     const h = Math.max(1.5, Math.min(intrinsicCh * cellSize * 0.55, 8));
 
     const { selectedDomain } = useTwinStore();
-
     const kpi = kpis.find(k => component.kpiIds?.includes(k.id));
     const statusColor = kpi ? STATUS_COLORS[kpi.status] : (component.color || '#4865f2');
 
     const groupRef = useRef();
     const glowRef = useRef();
     const isDragging = useRef(false);
-    const dragPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+    // Drag plane lives at this floor's Y level
+    const dragPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorY));
     const dragOffset = useRef(new THREE.Vector3());
     const { camera, gl } = useThree();
 
@@ -620,29 +533,21 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
             const t = state.clock.elapsedTime;
             const interactionType = kpi.interaction || 'pulse';
             const pulseVal = 0.05 + Math.max(0, Math.sin(t * 4)) * 0.4;
-            
             groupRef.current.traverse(child => {
                 if (child.isMesh && child.material && child !== glowRef.current && !child.name?.includes('shadow')) {
                     if (child.material.emissiveIntensity !== undefined) {
-                        // 1. Pulse interaction
                         if (interactionType === 'pulse') {
                             child.material.emissive = new THREE.Color(statusColor);
                             child.material.emissiveIntensity = pulseVal;
-                        } 
-                        // 2. Transition interaction
-                        else if (interactionType === 'transition') {
+                        } else if (interactionType === 'transition') {
                             child.material.emissive = new THREE.Color(statusColor);
-                            child.material.emissiveIntensity = 0.25; 
-                        }
-                        // Glow handles emissive reset
-                        else if (interactionType === 'glow') {
+                            child.material.emissiveIntensity = 0.25;
+                        } else if (interactionType === 'glow') {
                             child.material.emissiveIntensity = 0;
                         }
                     }
                 }
             });
-            
-            // 3. Glow interaction (Outer Box)
             if (interactionType === 'glow' && glowRef.current) {
                 glowRef.current.visible = true;
                 glowRef.current.material.opacity = 0.4 + Math.sin(t * 2) * 0.2;
@@ -650,13 +555,10 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
                 glowRef.current.visible = false;
             }
         } else {
-            // Reset state if back to green
             if (glowRef.current && !selected) glowRef.current.visible = false;
             groupRef.current.traverse(child => {
                 if (child.isMesh && child.material && child !== glowRef.current) {
-                    if (child.material.emissiveIntensity !== undefined) {
-                        child.material.emissiveIntensity = 0;
-                    }
+                    if (child.material.emissiveIntensity !== undefined) child.material.emissiveIntensity = 0;
                 }
             });
         }
@@ -664,10 +566,11 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
 
     const handlePointerDown = useCallback((e) => {
         if (e.ctrlKey || e.metaKey) {
-            // Ctrl+drag = move
             e.stopPropagation();
             isDragging.current = true;
             gl.domElement.style.cursor = 'grabbing';
+            // Reset drag plane to this floor's Y
+            dragPlane.current.constant = -floorY;
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(e.pointer, camera);
             const intersect = new THREE.Vector3();
@@ -676,7 +579,7 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
         } else {
             onSelect(component.id);
         }
-    }, [worldX, worldZ, camera, gl]);
+    }, [worldX, worldZ, floorY, camera, gl]);
 
     const handlePointerMove = useCallback((e) => {
         if (!isDragging.current) return;
@@ -709,7 +612,7 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
     return (
         <group
             ref={groupRef}
-            position={[worldX, 0, worldZ]}
+            position={[worldX, floorY, worldZ]}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -721,55 +624,42 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
                 <planeGeometry args={[w, d]} />
                 <meshStandardMaterial color="#000" opacity={0.15} transparent depthWrite={false} />
             </mesh>
-
-            {/* Domain-specific shape */}
+            {/* Domain shape */}
             <group rotation={[0, THREE.MathUtils.degToRad(-(component.rotation || 0)), 0]}>
                 <DomainShape type={component.type} w={localW} d={localD} h={h} color={statusColor} mesh3D={component.mesh3D} />
             </group>
-
-            {/* KPI Outline Glow or Selection glow */}
+            {/* Glow / selection outline */}
             <mesh ref={glowRef} position={[0, h * 0.5, 0]} visible={selected}>
                 <boxGeometry args={[w * 1.08, h * 1.05, d * 1.08]} />
                 <meshBasicMaterial color={selected ? '#4865f2' : statusColor} wireframe={selected} opacity={0.35} transparent depthWrite={false} />
             </mesh>
-
-            {/* KPI status indicator ring */}
+            {/* KPI status ring */}
             {kpi && (
                 <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
                     <ringGeometry args={[Math.max(w, d) * 0.42, Math.max(w, d) * 0.42 + 0.3, 32]} />
                     <meshBasicMaterial color={statusColor} opacity={selected ? 0.9 : 0.5} transparent />
                 </mesh>
             )}
-
-            {/* Component label + custom badge */}
+            {/* Label */}
             <Text position={[0, h + 1.0, 0]} fontSize={0.75} color={selected ? '#4865f2' : '#94a3c8'} anchorX="center" anchorY="bottom" maxWidth={w}>
                 {component.isCustom ? `${component.icon || '✨'} ${component.name}` : component.name}
             </Text>
-            {/* Custom component sub-label */}
             {component.isCustom && (
-                <Text position={[0, h + 0.2, 0]} fontSize={0.45} color="#a855f7" anchorX="center" anchorY="bottom" maxWidth={w}>
-                    AI Generated
-                </Text>
+                <Text position={[0, h + 0.2, 0]} fontSize={0.45} color="#a855f7" anchorX="center" anchorY="bottom" maxWidth={w}>AI Generated</Text>
             )}
-
-            {/* KPI value */}
             {kpi && (
                 <Text position={[0, h + 2.1, 0]} fontSize={0.65} color={statusColor} anchorX="center" anchorY="bottom">
                     {`${typeof kpi.value === 'number' ? kpi.value.toFixed(1) : kpi.value} ${kpi.unit}`}
                 </Text>
             )}
-
-            {/* Ctrl+drag hint when hovered */}
             {hovered && !selected && (
-                <Text position={[0, -0.5, 0]} fontSize={0.45} color="#4865f2" anchorX="center" anchorY="top" opacity={0.7}>
-                    Ctrl+drag to move
-                </Text>
+                <Text position={[0, -0.5, 0]} fontSize={0.45} color="#4865f2" anchorX="center" anchorY="top" opacity={0.7}>Ctrl+drag to move</Text>
             )}
         </group>
     );
 }
 
-// ─── Connection Arc ────────────────────────────────────────────────────────────
+// ─── Connection Arc (floor-aware) ─────────────────────────────────────────────
 function ConnectionArc({ connection, components, cellSize }) {
     const src = components.find(c => c.id === connection.sourceId);
     const tgt = components.find(c => c.id === connection.targetId);
@@ -781,13 +671,16 @@ function ConnectionArc({ connection, components, cellSize }) {
     const sz = src.row * cellSize + (sh * cellSize) / 2;
     const tx = tgt.col * cellSize + (tw * cellSize) / 2;
     const tz = tgt.row * cellSize + (th * cellSize) / 2;
+    const srcY = (src.floor ?? 0) * FLOOR_HEIGHT + 1.8;
+    const tgtY = (tgt.floor ?? 0) * FLOOR_HEIGHT + 1.8;
+    const peakY = Math.max(srcY, tgtY) + 4 + Math.hypot(tx - sx, tz - sz) * 0.06;
     const color = STATUS_COLORS[connection.flowStatus] || '#4865f2';
 
     const curve = useMemo(() => new THREE.CatmullRomCurve3([
-        new THREE.Vector3(sx, 1.8, sz),
-        new THREE.Vector3((sx + tx) / 2, 4 + Math.hypot(tx - sx, tz - sz) * 0.06, (sz + tz) / 2),
-        new THREE.Vector3(tx, 1.8, tz),
-    ]), [sx, sz, tx, tz]);
+        new THREE.Vector3(sx, srcY, sz),
+        new THREE.Vector3((sx + tx) / 2, peakY, (sz + tz) / 2),
+        new THREE.Vector3(tx, tgtY, tz),
+    ]), [sx, sz, tx, tz, srcY, tgtY, peakY]);
 
     const tubeRef = useRef();
     useFrame(state => {
@@ -803,33 +696,84 @@ function ConnectionArc({ connection, components, cellSize }) {
     );
 }
 
-// ─── Floor ─────────────────────────────────────────────────────────────────────
-function Floor({ cols, rows, cellSz }) {
-    const totalW = cols * cellSz, totalD = rows * cellSz;
+// ─── Floor Slab ────────────────────────────────────────────────────────────────
+function FloorSlab({ cols, rows, cellSz, yOffset, floorIndex, numFloors, totalW, totalD }) {
+    const accent = FLOOR_ACCENT[floorIndex % FLOOR_ACCENT.length];
+
     const gridLines = useMemo(() => {
         const pts = [];
-        for (let c = 0; c <= cols; c++) pts.push(c * cellSz, 0.02, 0, c * cellSz, 0.02, totalD);
-        for (let r = 0; r <= rows; r++) pts.push(0, 0.02, r * cellSz, totalW, 0.02, r * cellSz);
+        for (let c = 0; c <= cols; c++) pts.push(c * cellSz, yOffset + 0.02, 0, c * cellSz, yOffset + 0.02, totalD);
+        for (let r = 0; r <= rows; r++) pts.push(0, yOffset + 0.02, r * cellSz, totalW, yOffset + 0.02, r * cellSz);
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
         return geo;
-    }, [cols, rows, cellSz]);
+    }, [cols, rows, cellSz, yOffset, totalW, totalD]);
 
     const borderLines = useMemo(() => {
-        const pts = new Float32Array([0, 0.05, 0, totalW, 0.05, 0, totalW, 0.05, 0, totalW, 0.05, totalD, totalW, 0.05, totalD, 0, 0.05, totalD, 0, 0.05, totalD, 0, 0.05, 0]);
+        const y = yOffset + 0.05;
+        const pts = new Float32Array([
+            0, y, 0,        totalW, y, 0,
+            totalW, y, 0,   totalW, y, totalD,
+            totalW, y, totalD, 0, y, totalD,
+            0, y, totalD,   0, y, 0,
+        ]);
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
         return geo;
-    }, [totalW, totalD]);
+    }, [yOffset, totalW, totalD]);
+
+    // Structural pillars between floors (only from floor 1+)
+    const pillarHeight = FLOOR_HEIGHT;
+    const pillarY = yOffset - pillarHeight / 2;
+    const pillarPositions = [
+        [0, totalD], [totalW, 0], [totalW, totalD],
+        [totalW / 2, 0], [0, totalD / 2],
+    ];
 
     return (
         <group>
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[totalW / 2, 0, totalD / 2]} receiveShadow>
+            {/* Floor surface */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[totalW / 2, yOffset, totalD / 2]} receiveShadow>
                 <planeGeometry args={[totalW, totalD]} />
-                <meshStandardMaterial color="#f0f4f8" roughness={0.95} metalness={0.05} />
+                <meshStandardMaterial
+                    color={floorIndex === 0 ? '#f0f4f8' : '#f7f8fb'}
+                    roughness={0.95}
+                    metalness={0.05}
+                    transparent
+                    opacity={numFloors > 1 ? 0.92 : 1}
+                />
             </mesh>
-            <lineSegments geometry={gridLines}><lineBasicMaterial color="#94a3b8" opacity={0.8} transparent /></lineSegments>
-            <lineSegments geometry={borderLines}><lineBasicMaterial color="#4865f2" /></lineSegments>
+
+            {/* Grid lines */}
+            <lineSegments geometry={gridLines}>
+                <lineBasicMaterial color="#94a3b8" opacity={0.6} transparent />
+            </lineSegments>
+
+            {/* Accent border */}
+            <lineSegments geometry={borderLines}>
+                <lineBasicMaterial color={accent} opacity={0.7} transparent />
+            </lineSegments>
+
+            {/* Floor label (shown on the front edge) */}
+            <Text
+                position={[-1.5, yOffset + 0.4, totalD / 2]}
+                rotation={[0, Math.PI / 2, 0]}
+                fontSize={1.1}
+                color={accent}
+                anchorX="center"
+                anchorY="middle"
+                fontWeight="bold"
+            >
+                {`L${floorIndex + 1}`}
+            </Text>
+
+            {/* Structural columns (only for upper floors) */}
+            {floorIndex > 0 && pillarPositions.map(([px, pz], i) => (
+                <mesh key={i} position={[px, pillarY, pz]} castShadow>
+                    <boxGeometry args={[0.4, pillarHeight, 0.4]} />
+                    <meshStandardMaterial color="#cbd5e1" roughness={0.6} metalness={0.3} transparent opacity={0.55} />
+                </mesh>
+            ))}
         </group>
     );
 }
@@ -861,37 +805,109 @@ function SceneBackground() {
 }
 
 // ─── Main Export ───────────────────────────────────────────────────────────────
-export default function Scene3D() {
-    const { components, connections, kpis, gridCols, gridRows, cellSize, selectedComponentId, hoveredComponentId, selectComponent, hoverComponent, activeView, moveComponent } = useTwinStore();
-    const cols = gridCols || 10, rows = gridRows || 8, cs = cellSize || 6;
-    const cx = (cols * cs) / 2, cz = (rows * cs) / 2;
+export default function Scene3D({ cameraView, viewFloor = null }) {
+    const {
+        components, connections, kpis, gridCols, gridRows, cellSize,
+        selectedComponentId, hoveredComponentId, selectComponent, hoverComponent,
+        activeView, moveComponent,
+        numFloors,
+    } = useTwinStore();
 
-    const camPresets = {
-        isometric: [cx + 42, 40, cz + 42],
-        top: [cx, 85, cz + 0.001],
-        free: [cx + 25, 28, cz + 58],
+    const cols = gridCols || 10;
+    const rows = gridRows || 8;
+    const cs = cellSize || 6;
+    const totalW = cols * cs;
+    const totalD = rows * cs;
+    const cx = totalW / 2;
+    const cz = totalD / 2;
+
+    // When isolating a single floor, only render that floor's slab + components
+    const floorsToRender = viewFloor !== null
+        ? [viewFloor]
+        : Array.from({ length: numFloors }, (_, i) => i);
+
+    const visibleComponents = viewFloor !== null
+        ? components.filter(c => (c.floor ?? 0) === viewFloor)
+        : components;
+
+    // For single-floor view, connections on that floor only
+    const visibleConnections = viewFloor !== null
+        ? connections.filter(conn => {
+            const src = components.find(c => c.id === conn.sourceId);
+            const tgt = components.find(c => c.id === conn.targetId);
+            return (src?.floor ?? 0) === viewFloor && (tgt?.floor ?? 0) === viewFloor;
+          })
+        : connections;
+
+    const floorY = viewFloor !== null ? viewFloor * FLOOR_HEIGHT : 0;
+    const totalHeight = (numFloors - 1) * FLOOR_HEIGHT + 10;
+
+    // Camera presets — single-floor mode zooms to that floor's Y level
+    const resolvedView = cameraView || activeView || 'isometric';
+    const camPresets = viewFloor !== null ? {
+        isometric: [cx + 36, floorY + 30, cz + 36],
+        top:       [cx, floorY + 60, cz + 0.001],
+        front:     [cx, floorY + 18, cz + 60],
+        free:      [cx + 20, floorY + 22, cz + 50],
+    } : {
+        isometric: [cx + 42 + numFloors * 6, 40 + numFloors * 8, cz + 42 + numFloors * 6],
+        top:       [cx, 85 + numFloors * FLOOR_HEIGHT * 0.7, cz + 0.001],
+        front:     [cx, 20, cz + 80],
+        free:      [cx + 25, 28 + numFloors * 5, cz + 58],
     };
+
+    const orbitTarget = viewFloor !== null
+        ? [cx, floorY + 2, cz]
+        : [cx, totalHeight * 0.3, cz];
 
     return (
         <Canvas
-            key={activeView}
+            key={`${resolvedView}-${viewFloor}`}
             shadows
-            camera={{ position: camPresets[activeView] || camPresets.isometric, fov: 45, near: 0.1, far: 1000 }}
+            camera={{ position: camPresets[resolvedView] || camPresets.isometric, fov: 45, near: 0.1, far: 1000 }}
             style={{ width: '100%', height: '100%' }}
             gl={{ antialias: true, powerPreference: 'high-performance' }}
             onPointerMissed={() => selectComponent(null)}
         >
             <SceneBackground />
-            <fog attach="fog" args={['#f4f5f7', 130, 400]} />
+            <fog attach="fog" args={['#f4f5f7', 130, 500]} />
             <ambientLight intensity={0.7} />
-            <directionalLight position={[40, 60, 30]} intensity={1.2} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-cx - 20} shadow-camera-right={cx + 20} shadow-camera-top={cz + 20} shadow-camera-bottom={-20} shadow-camera-far={250} />
+            <directionalLight
+                position={[40, 60 + numFloors * FLOOR_HEIGHT * 0.5, 30]}
+                intensity={1.2}
+                castShadow
+                shadow-mapSize={[1024, 1024]}
+                shadow-camera-left={-cx - 20}
+                shadow-camera-right={cx + 20}
+                shadow-camera-top={cz + 20}
+                shadow-camera-bottom={-20}
+                shadow-camera-far={400}
+            />
             <hemisphereLight args={['#ffffff', '#e2e4e9', 0.6]} />
-            <pointLight position={[cx, 14, cz]} intensity={0.5} color="#4466dd" distance={160} />
+            <pointLight position={[cx, floorY + 14, cz]} intensity={0.5} color="#4466dd" distance={200} />
 
-            <Floor cols={cols} rows={rows} cellSz={cs} />
-            <Particles count={40} spread={[cols * cs, 20, rows * cs]} center={[cx, 8, cz]} />
+            {/* Render only the relevant floor slab(s) */}
+            {floorsToRender.map(fi => (
+                <FloorSlab
+                    key={fi}
+                    cols={cols}
+                    rows={rows}
+                    cellSz={cs}
+                    yOffset={fi * FLOOR_HEIGHT}
+                    floorIndex={fi}
+                    numFloors={numFloors}
+                    totalW={totalW}
+                    totalD={totalD}
+                />
+            ))}
 
-            {components.map(comp => (
+            <Particles
+                count={40}
+                spread={[totalW, viewFloor !== null ? 12 : 20 + totalHeight, totalD]}
+                center={[cx, floorY + 6, cz]}
+            />
+
+            {visibleComponents.map(comp => (
                 <ComponentMesh
                     key={comp.id}
                     component={comp}
@@ -905,11 +921,18 @@ export default function Scene3D() {
                 />
             ))}
 
-            {connections.map(conn => (
+            {visibleConnections.map(conn => (
                 <ConnectionArc key={conn.id} connection={conn} components={components} cellSize={cs} />
             ))}
 
-            <OrbitControls target={[cx, 0, cz]} enableDamping dampingFactor={0.06} minDistance={8} maxDistance={250} maxPolarAngle={Math.PI / 2.05} />
+            <OrbitControls
+                target={orbitTarget}
+                enableDamping
+                dampingFactor={0.06}
+                minDistance={8}
+                maxDistance={400}
+                maxPolarAngle={Math.PI / 2.05}
+            />
         </Canvas>
     );
 }

@@ -1,14 +1,9 @@
 /**
  * TwinView — Final Live View (Step 5)
  *
- * This page is ONLY for monitoring and analysis:
- *   - 3D Digital Twin visualization (left, main area)
- *   - Right sidebar with 3 tabs:
- *       📊 KPIs  — live real-time values from connected source
- *       📈 Charts — dynamic visualizations of KPI history
- *       🦙 AI    — NLQ chatbot for analytical questions
- *
- * Data source setup is done in Step 4 (KpiStep), not here.
+ * 3D Digital Twin visualization (left, main area)
+ * Right sidebar with 3 tabs: KPIs · Charts · AI
+ * Floor isolation buttons in the toolbar when numFloors > 1
  */
 import { useEffect, useState } from 'react';
 import useTwinStore from '../store/useTwinStore';
@@ -17,6 +12,7 @@ import KpiPanel from '../components/KpiPanel';
 import KpiCharts from '../components/KpiCharts';
 import Chatbot from '../components/Chatbot';
 import useKpiWebSocket from '../hooks/useKpiWebSocket';
+import { Layers } from 'lucide-react';
 
 const TABS = [
     { id: 'kpi',    label: '📊 KPIs' },
@@ -33,6 +29,12 @@ const WS_LABELS = {
     offline:      { color: '#64748b', dot: '○',  text: 'No data source' },
 };
 
+const FLOOR_COLORS = [
+    '#4865f2', '#10b981', '#f59e0b', '#ef4444',
+    '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
+    '#84cc16', '#64748b',
+];
+
 export default function TwinView() {
     const {
         kpis, components, connections,
@@ -40,35 +42,37 @@ export default function TwinView() {
         activePanel, setActivePanel,
         selectedComponentId, selectComponent,
         twinName, selectedDomain,
+        numFloors,
     } = useTwinStore();
 
     const [cameraView, setCameraView] = useState('Isometric');
     const [alertsOpen, setAlertsOpen] = useState(false);
+    // null = show all floors, 0/1/2… = isolate one floor
+    const [viewFloor, setViewFloor] = useState(null);
 
-    // Real-time KPI stream from backend file connector via WebSocket
     const { status: wsStatus, lastUpdate, messageCount, STATUS } = useKpiWebSocket(selectedDomain || 'airport');
 
-    // Fallback local timer only when WebSocket is not live
     useEffect(() => {
         if (wsStatus === STATUS.LIVE) return;
         const t = setInterval(updateKpiValues, 5000);
         return () => clearInterval(t);
     }, [wsStatus, STATUS.LIVE]);
 
-    // Auto-switch to Charts tab when user clicks a component
     useEffect(() => {
-        if (selectedComponentId) {
-            setActivePanel('charts');
-        }
+        if (selectedComponentId) setActivePanel('charts');
     }, [selectedComponentId]);
 
-    // Alert detection
     const critKpis = kpis.filter(k => k.status === 'red');
     const warnKpis = kpis.filter(k => k.status === 'orange');
     const selComp  = components.find(c => c.id === selectedComponentId);
+    const wsInfo   = WS_LABELS[wsStatus] || WS_LABELS.offline;
 
-    // WS status badge
-    const wsInfo = WS_LABELS[wsStatus] || WS_LABELS.offline;
+    // KPIs visible in isolated floor view
+    const visibleComponents = viewFloor !== null
+        ? components.filter(c => (c.floor ?? 0) === viewFloor)
+        : components;
+    const visibleKpiIds = new Set(visibleComponents.flatMap(c => c.kpiIds || []));
+    const visibleKpis = viewFloor !== null ? kpis.filter(k => visibleKpiIds.has(k.id)) : kpis;
 
     return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-0)' }}>
@@ -83,10 +87,11 @@ export default function TwinView() {
                     </span>
                     <span style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--text-2)' }}>
                         {components.length} components · {connections.length} connections
+                        {numFloors > 1 && ` · ${numFloors} floors`}
                     </span>
                 </div>
 
-                {/* WebSocket / source status */}
+                {/* WebSocket status */}
                 <div style={{ fontSize: '10px', padding: '3px 10px', borderRadius: '8px', fontWeight: 600, whiteSpace: 'nowrap',
                     background: `rgba(${wsStatus === 'live' ? '16,217,141' : wsStatus === 'connecting' || wsStatus === 'reconnecting' ? '245,158,11' : '100,116,139'},0.1)`,
                     color: wsInfo.color, border: `1px solid ${wsInfo.color}40` }}>
@@ -94,6 +99,45 @@ export default function TwinView() {
                     {wsStatus === 'live' && <span style={{ marginLeft: '6px', opacity: 0.65, fontWeight: 400 }}>· {messageCount} readings</span>}
                     {lastUpdate && wsStatus === 'live' && <span style={{ marginLeft: '6px', opacity: 0.5, fontWeight: 400 }}>{lastUpdate.toLocaleTimeString()}</span>}
                 </div>
+
+                {/* ── Floor isolation buttons (only when multi-floor) ── */}
+                {numFloors > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--bg-0)', borderRadius: '8px', padding: '2px', border: '1px solid var(--border)' }}>
+                        <Layers size={11} style={{ color: 'var(--text-2)', marginLeft: '5px' }} />
+                        {/* "All" button */}
+                        <button
+                            onClick={() => setViewFloor(null)}
+                            style={{
+                                padding: '3px 8px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                                fontSize: '10px', fontWeight: 600, transition: 'all 0.15s',
+                                background: viewFloor === null ? 'var(--accent)' : 'transparent',
+                                color: viewFloor === null ? '#fff' : 'var(--text-2)',
+                            }}
+                        >
+                            All
+                        </button>
+                        {/* Per-floor buttons */}
+                        {Array.from({ length: numFloors }).map((_, fi) => {
+                            const isActive = viewFloor === fi;
+                            const color = FLOOR_COLORS[fi % FLOOR_COLORS.length];
+                            return (
+                                <button
+                                    key={fi}
+                                    onClick={() => setViewFloor(isActive ? null : fi)}
+                                    title={`Isolate Floor ${fi + 1}`}
+                                    style={{
+                                        padding: '3px 8px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                                        fontSize: '10px', fontWeight: 600, transition: 'all 0.15s',
+                                        background: isActive ? color : 'transparent',
+                                        color: isActive ? '#fff' : 'var(--text-2)',
+                                    }}
+                                >
+                                    L{fi + 1}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
 
                 {/* Camera views */}
                 <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-0)', borderRadius: '8px', padding: '2px' }}>
@@ -113,7 +157,6 @@ export default function TwinView() {
                     🔔 {critKpis.length > 0 ? `${critKpis.length} Critical` : warnKpis.length > 0 ? `${warnKpis.length} Warn` : 'No alerts'}
                 </button>
 
-                {/* Back to KPI setup */}
                 <button className="btn btn-ghost" style={{ fontSize: '11px' }} onClick={() => setStep(4)}>
                     ← KPI Setup
                 </button>
@@ -133,20 +176,43 @@ export default function TwinView() {
                 </div>
             )}
 
+            {/* ── Floor isolation banner ─────────────────────────────────── */}
+            {viewFloor !== null && (
+                <div style={{
+                    padding: '4px 14px', background: `${FLOOR_COLORS[viewFloor % FLOOR_COLORS.length]}14`,
+                    borderBottom: `1px solid ${FLOOR_COLORS[viewFloor % FLOOR_COLORS.length]}40`,
+                    display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0,
+                }}>
+                    <Layers size={11} style={{ color: FLOOR_COLORS[viewFloor % FLOOR_COLORS.length] }} />
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: FLOOR_COLORS[viewFloor % FLOOR_COLORS.length] }}>
+                        Viewing Floor {viewFloor + 1} only
+                    </span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-2)' }}>
+                        · {visibleComponents.length} components · {visibleKpis.length} KPIs
+                    </span>
+                    <button
+                        onClick={() => setViewFloor(null)}
+                        style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', borderRadius: '6px', background: 'transparent', border: `1px solid ${FLOOR_COLORS[viewFloor % FLOOR_COLORS.length]}40`, color: FLOOR_COLORS[viewFloor % FLOOR_COLORS.length], cursor: 'pointer' }}
+                    >
+                        Show all floors
+                    </button>
+                </div>
+            )}
+
             {/* ── Main content ──────────────────────────────────────────── */}
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
 
                 {/* 3D Scene */}
                 <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-                    <Scene3D cameraView={cameraView.toLowerCase()} />
+                    <Scene3D cameraView={cameraView.toLowerCase()} viewFloor={viewFloor} />
 
-                    {/* Stats overlay — top left */}
+                    {/* Stats overlay */}
                     <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', flexDirection: 'column', gap: '6px', pointerEvents: 'none' }}>
                         {[
-                            { icon: '⬡', label: 'Components', value: components.length, color: '#4865f2' },
-                            { icon: '✅', label: 'OK', value: kpis.filter(k => k.status === 'green').length, color: '#10d98d' },
-                            { icon: '⚠️', label: 'Warnings', value: warnKpis.length, color: '#f59e0b' },
-                            { icon: '🚨', label: 'Critical', value: critKpis.length, color: '#ef4444' },
+                            { icon: '⬡', label: 'Components', value: visibleComponents.length, color: '#4865f2' },
+                            { icon: '✅', label: 'OK',         value: visibleKpis.filter(k => k.status === 'green').length,  color: '#10d98d' },
+                            { icon: '⚠️', label: 'Warnings',  value: visibleKpis.filter(k => k.status === 'orange').length, color: '#f59e0b' },
+                            { icon: '🚨', label: 'Critical',  value: visibleKpis.filter(k => k.status === 'red').length,    color: '#ef4444' },
                         ].map(s => (
                             <div key={s.label} style={{ padding: '5px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.88)', border: `1px solid ${s.color}28`, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span style={{ fontSize: '13px' }}>{s.icon}</span>
@@ -173,7 +239,10 @@ export default function TwinView() {
                             <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: selComp.color, flexShrink: 0 }} />
                             <div>
                                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-0)' }}>{selComp.name}</div>
-                                <div style={{ fontSize: '10px', color: 'var(--text-2)' }}>{selComp.type?.replace(/_/g, ' ')} · {selComp.gridSize?.join('×')} cells</div>
+                                <div style={{ fontSize: '10px', color: 'var(--text-2)' }}>
+                                    {selComp.type?.replace(/_/g, ' ')} · {selComp.gridSize?.join('×')} cells
+                                    {numFloors > 1 && ` · Floor ${(selComp.floor ?? 0) + 1}`}
+                                </div>
                             </div>
                             {kpis.filter(k => selComp.kpiIds?.includes(k.id)).map(k => (
                                 <div key={k.id} style={{ textAlign: 'center' }}>
@@ -183,15 +252,13 @@ export default function TwinView() {
                                     <div style={{ fontSize: '9px', color: '#64748b' }}>{k.unit || k.name}</div>
                                 </div>
                             ))}
-                            <button onClick={() => selectComponent(null)} style={{ pointerEvents: 'all', fontSize: '10px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(72,101,242,0.12)', border: '1px solid rgba(72,101,242,0.3)', color: '#4865f2', cursor: 'pointer' }}>✕</button>
+                            <button onClick={() => selectComponent(null)} style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(72,101,242,0.12)', border: '1px solid rgba(72,101,242,0.3)', color: '#4865f2', cursor: 'pointer' }}>✕</button>
                         </div>
                     )}
                 </div>
 
                 {/* ── Right sidebar ─────────────────────────────────────── */}
                 <div style={{ width: '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)', background: 'var(--bg-1)', overflow: 'hidden' }}>
-
-                    {/* Tabs */}
                     <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg-0)', flexShrink: 0 }}>
                         {TABS.map(t => (
                             <button key={t.id} onClick={() => setActivePanel(t.id)}
@@ -203,8 +270,6 @@ export default function TwinView() {
                             </button>
                         ))}
                     </div>
-
-                    {/* Panel content */}
                     <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                         {activePanel === 'kpi'    && <KpiPanel />}
                         {activePanel === 'charts' && <KpiCharts />}

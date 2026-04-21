@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Trash2, RotateCcw, Plus, Minus } from 'lucide-react';
 import useTwinStore from '../store/useTwinStore';
 
@@ -6,12 +6,29 @@ const CELL_PX = 40;
 const STATUS_COLORS = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
 
 export default function Grid2D() {
-    const { currentStep, components, connections, kpis, gridCols, gridRows, selectedComponentId, hoveredComponentId, selectComponent, hoverComponent, moveComponent, removeComponent, addConnection, rotateComponent, resizeComponent, renameComponent } = useTwinStore();
+    const {
+        currentStep, components: allComponents, connections: allConnections,
+        kpis, gridCols, gridRows, selectedComponentId, hoveredComponentId,
+        selectComponent, hoverComponent, moveComponent, removeComponent,
+        addConnection, rotateComponent, resizeComponent, renameComponent,
+        activeFloor,
+    } = useTwinStore();
+
     const cols = gridCols || 10;
     const rows = gridRows || 8;
     const isConnectionStep = currentStep === 3;
-    const [dragging, setDragging] = useState(null); // { id, offsetCol, offsetRow }
-    const [ghostPos, setGhostPos] = useState(null);  // { col, row }
+
+    // ── Filter to active floor ─────────────────────────────────────────────────
+    const components = allComponents.filter(c => (c.floor ?? 0) === activeFloor);
+    // Connections: show only if both endpoints are on this floor
+    const connections = allConnections.filter(conn => {
+        const src = allComponents.find(c => c.id === conn.sourceId);
+        const tgt = allComponents.find(c => c.id === conn.targetId);
+        return (src?.floor ?? 0) === activeFloor && (tgt?.floor ?? 0) === activeFloor;
+    });
+
+    const [dragging, setDragging] = useState(null);
+    const [ghostPos, setGhostPos] = useState(null);
     const [linkingFrom, setLinkingFrom] = useState(null);
     const [mousePos, setMousePos] = useState(null);
     const gridRef = useRef(null);
@@ -31,7 +48,7 @@ export default function Grid2D() {
         setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     };
 
-    // Build occupied map
+    // Build occupied map (floor-scoped)
     const cellMap = {};
     components.forEach(comp => {
         const [cw, ch] = comp.gridSize;
@@ -67,7 +84,6 @@ export default function Grid2D() {
         setMousePos(null);
     };
 
-    // Check if ghost fits
     const ghostOk = () => {
         if (!dragging || !ghostPos) return false;
         const comp = components.find(c => c.id === dragging.id);
@@ -83,7 +99,9 @@ export default function Grid2D() {
         return true;
     };
 
-    const selectedComp = selectedComponentId ? components.find(c => c.id === selectedComponentId) : null;
+    const selectedComp = selectedComponentId
+        ? components.find(c => c.id === selectedComponentId)
+        : null;
 
     return (
         <div style={{ position: 'relative', overflow: 'auto', flex: 1, userSelect: 'none' }} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
@@ -97,119 +115,52 @@ export default function Grid2D() {
                     borderBottom: '1px solid rgba(72,101,242,0.2)',
                     boxShadow: '0 2px 8px rgba(72,101,242,0.06)',
                 }}>
-                    {/* Component info */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '14px' }}>{getTypeIcon(selectedComp.type)}</span>
-                        <input 
+                        <input
                             value={selectedComp.name}
                             onChange={(e) => renameComponent(selectedComp.id, e.target.value)}
                             onMouseDown={(e) => e.stopPropagation()}
-                            style={{ 
-                                fontSize: '12px', 
-                                fontWeight: 600, 
-                                color: 'var(--text-1, #1e293b)', 
-                                background: 'transparent',
-                                border: '1px solid transparent',
+                            style={{
+                                fontSize: '12px', fontWeight: 600, color: 'var(--text-1, #1e293b)',
+                                background: 'transparent', border: '1px solid transparent',
                                 borderBottom: '1px solid dashed rgba(72,101,242,0.4)',
-                                borderRadius: '2px',
-                                outline: 'none',
-                                padding: '2px 4px',
-                                width: '140px',
-                                transition: 'all 0.2s ease'
+                                borderRadius: '2px', outline: 'none', padding: '2px 4px',
+                                width: '140px', transition: 'all 0.2s ease',
                             }}
                             onFocus={e => e.currentTarget.style.borderBottom = '1px solid #4865f2'}
                             onBlur={e => e.currentTarget.style.borderBottom = '1px solid dashed rgba(72,101,242,0.4)'}
                             title="Rename Component"
                         />
                     </div>
-
-                    {/* Separator */}
                     <div style={{ width: '1px', height: '20px', background: 'rgba(72,101,242,0.15)' }} />
-
                     {/* Width controls */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span style={{ fontSize: '10px', color: 'var(--text-2, #94a3c8)', fontWeight: 700, letterSpacing: '0.05em' }}>Width</span>
-                        <button
-                            onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0] - 1, selectedComp.gridSize[1])}
-                            disabled={selectedComp.gridSize[0] <= 1}
-                            style={{
-                                width: '22px', height: '22px', borderRadius: '5px',
-                                border: '1px solid rgba(72,101,242,0.25)',
-                                background: selectedComp.gridSize[0] <= 1 ? 'rgba(72,101,242,0.03)' : 'rgba(72,101,242,0.08)',
-                                color: selectedComp.gridSize[0] <= 1 ? 'rgba(148,163,200,0.3)' : '#4865f2',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: selectedComp.gridSize[0] <= 1 ? 'not-allowed' : 'pointer', padding: 0,
-                                transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={e => { if (selectedComp.gridSize[0] > 1) e.currentTarget.style.background = 'rgba(72,101,242,0.18)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = selectedComp.gridSize[0] <= 1 ? 'rgba(72,101,242,0.03)' : 'rgba(72,101,242,0.08)'; }}
-                            title="Decrease width"
-                        >
+                        <button onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0] - 1, selectedComp.gridSize[1])} disabled={selectedComp.gridSize[0] <= 1}
+                            style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid rgba(72,101,242,0.25)', background: selectedComp.gridSize[0] <= 1 ? 'rgba(72,101,242,0.03)' : 'rgba(72,101,242,0.08)', color: selectedComp.gridSize[0] <= 1 ? 'rgba(148,163,200,0.3)' : '#4865f2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: selectedComp.gridSize[0] <= 1 ? 'not-allowed' : 'pointer', padding: 0, transition: 'all 0.15s' }}>
                             <Minus size={12} />
                         </button>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: '#4865f2', minWidth: '18px', textAlign: 'center' }}>{selectedComp.gridSize[0]}</span>
-                        <button
-                            onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0] + 1, selectedComp.gridSize[1])}
-                            style={{
-                                width: '22px', height: '22px', borderRadius: '5px',
-                                border: '1px solid rgba(72,101,242,0.25)',
-                                background: 'rgba(72,101,242,0.08)', color: '#4865f2',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: 'pointer', padding: 0,
-                                transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.18)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.08)'; }}
-                            title="Increase width"
-                        >
+                        <button onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0] + 1, selectedComp.gridSize[1])}
+                            style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid rgba(72,101,242,0.25)', background: 'rgba(72,101,242,0.08)', color: '#4865f2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, transition: 'all 0.15s' }}>
                             <Plus size={12} />
                         </button>
                     </div>
-
-                    {/* Separator */}
                     <div style={{ width: '1px', height: '20px', background: 'rgba(72,101,242,0.15)' }} />
-
                     {/* Height controls */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: '10px', color: 'var(--text-2, #94a3c8)', fontWeight: 700, letterSpacing: '0.05em' }}>Height</span>
-                        <button
-                            onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0], selectedComp.gridSize[1] - 1)}
-                            disabled={selectedComp.gridSize[1] <= 1}
-                            style={{
-                                width: '22px', height: '22px', borderRadius: '5px',
-                                border: '1px solid rgba(72,101,242,0.25)',
-                                background: selectedComp.gridSize[1] <= 1 ? 'rgba(72,101,242,0.03)' : 'rgba(72,101,242,0.08)',
-                                color: selectedComp.gridSize[1] <= 1 ? 'rgba(148,163,200,0.3)' : '#4865f2',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: selectedComp.gridSize[1] <= 1 ? 'not-allowed' : 'pointer', padding: 0,
-                                transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={e => { if (selectedComp.gridSize[1] > 1) e.currentTarget.style.background = 'rgba(72,101,242,0.18)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = selectedComp.gridSize[1] <= 1 ? 'rgba(72,101,242,0.03)' : 'rgba(72,101,242,0.08)'; }}
-                            title="Decrease height"
-                        >
+                        <span style={{ fontSize: '10px', color: 'var(--text-2, #94a3c8)', fontWeight: 700, letterSpacing: '0.05em' }}>Depth</span>
+                        <button onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0], selectedComp.gridSize[1] - 1)} disabled={selectedComp.gridSize[1] <= 1}
+                            style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid rgba(72,101,242,0.25)', background: selectedComp.gridSize[1] <= 1 ? 'rgba(72,101,242,0.03)' : 'rgba(72,101,242,0.08)', color: selectedComp.gridSize[1] <= 1 ? 'rgba(148,163,200,0.3)' : '#4865f2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: selectedComp.gridSize[1] <= 1 ? 'not-allowed' : 'pointer', padding: 0, transition: 'all 0.15s' }}>
                             <Minus size={12} />
                         </button>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: '#4865f2', minWidth: '18px', textAlign: 'center' }}>{selectedComp.gridSize[1]}</span>
-                        <button
-                            onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0], selectedComp.gridSize[1] + 1)}
-                            style={{
-                                width: '22px', height: '22px', borderRadius: '5px',
-                                border: '1px solid rgba(72,101,242,0.25)',
-                                background: 'rgba(72,101,242,0.08)', color: '#4865f2',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: 'pointer', padding: 0,
-                                transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.18)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.08)'; }}
-                            title="Increase height"
-                        >
+                        <button onClick={() => resizeComponent(selectedComp.id, selectedComp.gridSize[0], selectedComp.gridSize[1] + 1)}
+                            style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid rgba(72,101,242,0.25)', background: 'rgba(72,101,242,0.08)', color: '#4865f2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, transition: 'all 0.15s' }}>
                             <Plus size={12} />
                         </button>
                     </div>
-
-                    {/* Dimensions display */}
                     <span style={{ fontSize: '10px', color: 'var(--text-2, #94a3c8)', fontWeight: 500, marginLeft: '4px' }}>
                         ({selectedComp.gridSize[0]}×{selectedComp.gridSize[1]} cells)
                     </span>
@@ -253,13 +204,13 @@ export default function Grid2D() {
                                 const p1 = getCenter(src);
                                 const p2 = getCenter(tgt);
                                 const color = STATUS_COLORS[conn.flowStatus] || '#10d98d';
-                                return <line key={conn.id} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={color} strokeWidth="3" strokeLinecap="round" opacity={0.6} />
+                                return <line key={conn.id} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={color} strokeWidth="3" strokeLinecap="round" opacity={0.6} />;
                             })}
                             {linkingFrom && mousePos && (() => {
                                 const src = components.find(c => c.id === linkingFrom);
                                 if (!src) return null;
                                 const p1 = getCenter(src);
-                                return <line x1={p1.x} y1={p1.y} x2={mousePos.x} y2={mousePos.y} stroke="#4865f2" strokeWidth="2" strokeDasharray="4" strokeLinecap="round" />
+                                return <line x1={p1.x} y1={p1.y} x2={mousePos.x} y2={mousePos.y} stroke="#4865f2" strokeWidth="2" strokeDasharray="4" strokeLinecap="round" />;
                             })()}
                         </svg>
                     )}
@@ -274,7 +225,6 @@ export default function Grid2D() {
                             const isDraggingThis = dragging?.id === comp?.id;
                             const statusColor = kpi ? STATUS_COLORS[kpi.status] : null;
 
-                            // Ghost display
                             const isGhost = dragging && ghostPos && ghostPos.col === col && ghostPos.row === row;
                             const ghostFits = ghostOk();
 
@@ -292,35 +242,25 @@ export default function Grid2D() {
                                         width: comp ? `${w}px` : `${CELL_PX}px`,
                                         height: comp ? `${h}px` : `${CELL_PX}px`,
                                         background: comp
-                                            ? isDraggingThis
-                                                ? 'rgba(72,101,242,0.08)'
-                                                : isSelected
-                                                    ? `rgba(72,101,242,0.18)`
-                                                    : isHovered
-                                                        ? `rgba(72,101,242,0.1)`
+                                            ? isDraggingThis ? 'rgba(72,101,242,0.08)'
+                                                : isSelected ? 'rgba(72,101,242,0.18)'
+                                                    : isHovered ? 'rgba(72,101,242,0.1)'
                                                         : `rgba(${hexRgb(comp.color)},0.12)`
                                             : isGhost
                                                 ? ghostFits ? 'rgba(72,101,242,0.15)' : 'rgba(239,68,68,0.15)'
                                                 : 'rgba(72,101,242,0.03)',
                                         border: comp
-                                            ? isDraggingThis
-                                                ? '1.5px dashed #4865f2'
-                                                : isSelected
-                                                    ? '1.5px solid #4865f2'
-                                                    : isHovered
-                                                        ? `1.5px solid rgba(${hexRgb(comp.color)},0.8)`
+                                            ? isDraggingThis ? '1.5px dashed #4865f2'
+                                                : isSelected ? '1.5px solid #4865f2'
+                                                    : isHovered ? `1.5px solid rgba(${hexRgb(comp.color)},0.8)`
                                                         : `1px solid rgba(${hexRgb(comp.color)},0.35)`
                                             : isGhost
                                                 ? ghostFits ? '1.5px dashed #4865f2' : '1.5px dashed #ef4444'
                                                 : '1px dashed rgba(72,101,242,0.25)',
                                         borderRadius: comp ? '5px' : '2px',
                                         cursor: comp ? (dragging ? 'grabbing' : isConnectionStep ? 'crosshair' : 'grab') : isGhost ? 'crosshair' : 'default',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        overflow: 'hidden',
-                                        position: 'relative',
+                                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                        overflow: 'hidden', position: 'relative',
                                         transition: isDraggingThis ? 'none' : 'all 0.15s ease',
                                         opacity: isDraggingThis ? 0.4 : 1,
                                         boxShadow: isSelected && !isDraggingThis ? '0 0 10px rgba(72,101,242,0.2)' : 'none',
@@ -334,109 +274,52 @@ export default function Grid2D() {
                                             setMousePos(null);
                                         }
                                     }}
-                                    onMouseEnter={() => {
-                                        if (comp) hoverComponent(comp.id);
-                                        handleCellEnter(col, row);
-                                    }}
+                                    onMouseEnter={() => { if (comp) hoverComponent(comp.id); handleCellEnter(col, row); }}
                                     onMouseLeave={() => hoverComponent(null)}
                                     onClick={() => !dragging && comp && selectComponent(comp.id)}
                                 >
                                     {comp && (
                                         <>
-                                            {/* KPI status strip */}
                                             {statusColor && (
                                                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: statusColor, opacity: 0.9 }} />
                                             )}
-                                            {/* Component type icon */}
                                             <div style={{ transform: `rotate(${comp.rotation || 0}deg)`, transition: 'transform 0.2s', fontSize: CELL_PX > 36 ? '14px' : '10px', lineHeight: 1, marginBottom: '2px' }}>
                                                 {getTypeIcon(comp.type)}
                                             </div>
                                             <span style={{ fontSize: '8px', fontWeight: 600, color: isSelected ? '#4865f2' : '#94a3c8', textAlign: 'center', lineHeight: 1.1, padding: '0 2px' }}>
                                                 {comp.name}
                                             </span>
-                                            {/* KPI value */}
                                             {kpi && (
                                                 <span style={{ fontSize: '8px', fontWeight: 700, color: statusColor, marginTop: '1px' }}>
                                                     {typeof kpi.value === 'number' ? kpi.value.toFixed(0) : kpi.value}{kpi.unit}
                                                 </span>
                                             )}
-                                            {/* KPI Dynamic Interaction Layer */}
                                             {kpi && kpi.status !== 'green' && (
-                                                <div style={{ 
+                                                <div style={{
                                                     position: 'absolute', inset: 0, borderRadius: '5px', pointerEvents: 'none',
                                                     ...(kpi.interaction === 'pulse' ? { background: `rgba(${hexRgb(statusColor)},0.15)`, animation: 'pulse-bg 1s ease-in-out infinite' } : {}),
                                                     ...(kpi.interaction === 'transition' ? { background: `rgba(${hexRgb(statusColor)},0.25)` } : {}),
-                                                    ...(kpi.interaction === 'glow' ? { boxShadow: `inset 0 0 12px ${statusColor}, 0 0 8px ${statusColor}`, border: `2px solid ${statusColor}` } : {})
+                                                    ...(kpi.interaction === 'glow' ? { boxShadow: `inset 0 0 12px ${statusColor}, 0 0 8px ${statusColor}`, border: `2px solid ${statusColor}` } : {}),
                                                 }} />
                                             )}
-                                            {/* Rotate button */}
                                             {isSelected && !isDraggingThis && (
                                                 <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        rotateComponent(comp.id);
-                                                    }}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '4px',
-                                                        left: '4px',
-                                                        width: '18px',
-                                                        height: '18px',
-                                                        borderRadius: '50%',
-                                                        background: 'rgba(72,101,242,0.15)',
-                                                        border: '1px solid rgba(72,101,242,0.3)',
-                                                        color: '#4865f2',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        cursor: 'pointer',
-                                                        zIndex: 10,
-                                                        padding: 0,
-                                                    }}
-                                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.25)'; }}
-                                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(72,101,242,0.15)'; }}
-                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                    title="Rotate Component"
-                                                >
+                                                    onClick={(e) => { e.stopPropagation(); rotateComponent(comp.id); }}
+                                                    style={{ position: 'absolute', top: '4px', left: '4px', width: '18px', height: '18px', borderRadius: '50%', background: 'rgba(72,101,242,0.15)', border: '1px solid rgba(72,101,242,0.3)', color: '#4865f2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10, padding: 0 }}
+                                                    onMouseDown={(e) => e.stopPropagation()} title="Rotate Component">
                                                     <RotateCcw size={10} />
                                                 </button>
                                             )}
-                                            {/* Delete button */}
                                             {isSelected && !isDraggingThis && (
                                                 <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        removeComponent(comp.id);
-                                                    }}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '4px',
-                                                        right: '4px',
-                                                        width: '18px',
-                                                        height: '18px',
-                                                        borderRadius: '50%',
-                                                        background: 'rgba(239,68,68,0.15)',
-                                                        border: '1px solid rgba(239,68,68,0.3)',
-                                                        color: '#ef4444',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        cursor: 'pointer',
-                                                        zIndex: 10,
-                                                        padding: 0,
-                                                    }}
-                                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.25)'; }}
-                                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; }}
-                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                    title="Delete Component"
-                                                >
+                                                    onClick={(e) => { e.stopPropagation(); removeComponent(comp.id); }}
+                                                    style={{ position: 'absolute', top: '4px', right: '4px', width: '18px', height: '18px', borderRadius: '50%', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10, padding: 0 }}
+                                                    onMouseDown={(e) => e.stopPropagation()} title="Delete Component">
                                                     <Trash2 size={10} />
                                                 </button>
                                             )}
-
                                         </>
                                     )}
-                                    {/* Ghost cell */}
                                     {!comp && isGhost && (
                                         <div style={{ width: '60%', height: '60%', borderRadius: '3px', background: ghostFits ? 'rgba(72,101,242,0.3)' : 'rgba(239,68,68,0.3)' }} />
                                     )}

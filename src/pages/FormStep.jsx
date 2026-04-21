@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import useTwinStore, { DOMAINS } from '../store/useTwinStore';
-import { ChevronRight, ArrowLeft, Check } from 'lucide-react';
+import { ChevronRight, ArrowLeft, Check, Layers } from 'lucide-react';
 
 const DOMAIN_ICONS = { factory: '🏭', airport: '✈️', warehouse: '📦' };
 
 export default function FormStep() {
-    const { setStep, setDomain, setTwinName, setDimensions, selectedDomain, twinName, width, length, initScene, createTwin } = useTwinStore();
+    const { setStep, setDomain, setTwinName, setDimensions, setNumFloors, selectedDomain, twinName, width, length, numFloors, initScene, createTwin } = useTwinStore();
     const [localName, setLocalName] = useState(twinName || '');
     const [localDomain, setLocalDomain] = useState(selectedDomain || '');
     const [localWidth, setLocalWidth] = useState(width || 60);
     const [localLength, setLocalLength] = useState(length || 40);
+    const [localFloors, setLocalFloors] = useState(numFloors || 1);
 
     const cellSize = 6;
     const gridCols = Math.ceil(localWidth / cellSize);
@@ -23,18 +24,21 @@ export default function FormStep() {
         setDomain(localDomain);
         setTwinName(localName);
         setDimensions(localWidth, localLength);
+        setNumFloors(localFloors);
         initScene();
         createTwin();
         setStep(2);
     };
 
+    const handleFloors = (val) => {
+        const n = Math.max(1, Math.min(10, val));
+        setLocalFloors(n);
+    };
+
     return (
         <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
             <div style={{ width: '100%', maxWidth: '680px' }}>
-                <div
-                    className="glass animate-fade"
-                    style={{ padding: '40px' }}
-                >
+                <div className="glass animate-fade" style={{ padding: '40px' }}>
                     <div style={{ marginBottom: '32px' }}>
                         <h2 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: '8px' }}>
                             Configure Your Twin
@@ -100,8 +104,8 @@ export default function FormStep() {
                         </div>
                     </div>
 
-                    {/* Dimensions */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                    {/* Dimensions + Floors row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
                         <div>
                             <label className="label">Width (meters)</label>
                             <input
@@ -123,6 +127,60 @@ export default function FormStep() {
                                 value={localLength}
                                 onChange={e => setLocalLength(Number(e.target.value))}
                             />
+                        </div>
+                        {/* ── Floors stepper ── */}
+                        <div>
+                            <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <Layers size={12} />
+                                Number of Floors
+                            </label>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0',
+                                background: 'var(--bg-3)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                height: '40px',
+                            }}>
+                                <button
+                                    onClick={() => handleFloors(localFloors - 1)}
+                                    disabled={localFloors <= 1}
+                                    style={{
+                                        width: '40px', height: '100%', border: 'none',
+                                        background: 'transparent',
+                                        color: localFloors <= 1 ? 'var(--text-2)' : 'var(--text-0)',
+                                        fontSize: '18px', fontWeight: 700, cursor: localFloors <= 1 ? 'not-allowed' : 'pointer',
+                                        opacity: localFloors <= 1 ? 0.3 : 1,
+                                        borderRight: '1px solid var(--border)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}
+                                >−</button>
+                                <div style={{
+                                    flex: 1, textAlign: 'center',
+                                    fontSize: '15px', fontWeight: 700,
+                                    color: 'var(--accent)',
+                                }}>
+                                    {localFloors}
+                                </div>
+                                <button
+                                    onClick={() => handleFloors(localFloors + 1)}
+                                    disabled={localFloors >= 10}
+                                    style={{
+                                        width: '40px', height: '100%', border: 'none',
+                                        background: 'transparent',
+                                        color: localFloors >= 10 ? 'var(--text-2)' : 'var(--text-0)',
+                                        fontSize: '18px', fontWeight: 700, cursor: localFloors >= 10 ? 'not-allowed' : 'pointer',
+                                        opacity: localFloors >= 10 ? 0.3 : 1,
+                                        borderLeft: '1px solid var(--border)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}
+                                >+</button>
+                            </div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-2)', marginTop: '4px', textAlign: 'center' }}>
+                                {localFloors === 1 ? 'Single level' : `${localFloors} stacked levels`}
+                            </div>
                         </div>
                     </div>
 
@@ -157,6 +215,15 @@ export default function FormStep() {
                                 <div style={{ fontSize: '11px', color: 'var(--text-2)', marginBottom: '2px' }}>Cell Size</div>
                                 <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent)' }}>6m²</div>
                             </div>
+                            {localFloors > 1 && (
+                                <div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-2)', marginBottom: '2px' }}>Floors</div>
+                                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Layers size={14} />
+                                        {localFloors}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

@@ -63,51 +63,6 @@ const generateKpis = (domain) => {
 const getBlueprint = (domain, type) =>
     DOMAINS[domain]?.components.find(c => c.type === type);
 
-const generateComponents = (domain, gridCols, gridRows) => {
-    const blueprints = DOMAINS[domain]?.components || [];
-    const placed = [];
-    const occupied = new Set();
-    let idCounter = 1;
-
-    const canPlace = (col, row, w, h) => {
-        for (let r = row; r < row + h; r++)
-            for (let c = col; c < col + w; c++)
-                if (c >= gridCols || r >= gridRows || occupied.has(`${r}-${c}`)) return false;
-        return true;
-    };
-    const markOccupied = (col, row, w, h) => {
-        for (let r = row; r < row + h; r++)
-            for (let c = col; c < col + w; c++)
-                occupied.add(`${r}-${c}`);
-    };
-
-    for (const bp of blueprints) {
-        const [w, h] = bp.gridSize;
-        for (let row = 1; row < gridRows - h; row++) {
-            let found = false;
-            for (let col = 1; col < gridCols - w; col++) {
-                if (canPlace(col, row, w, h)) {
-                    placed.push({ id: `${bp.type}_${idCounter++}`, type: bp.type, name: `${bp.name} ${idCounter - 1}`, gridSize: bp.gridSize, color: bp.color, col, row, kpiIds: [] });
-                    markOccupied(col, row, w, h);
-                    found = true; break;
-                }
-            }
-            if (found) break;
-        }
-    }
-    return placed;
-};
-
-const generateConnections = (components) => {
-    const connections = [];
-    const statuses = ['green', 'orange', 'green', 'red'];
-    for (let i = 0; i < Math.min(components.length - 1, 5); i++) {
-        connections.push({ id: `conn_${i}`, sourceId: components[i].id, targetId: components[i + 1].id, flowStatus: statuses[i % 4] });
-    }
-    return connections;
-};
-
-// Generate simulated history for charts
 const generateHistory = (kpis) => {
     const now = Date.now();
     const history = [];
@@ -139,8 +94,7 @@ const AI_RESPONSES = (kpis, msg) => {
     if (lower.includes('recommend') || lower.includes('action') || lower.includes('conseil')) {
         const issues = [...criticals, ...warnings];
         if (issues.length === 0) return '✅ All KPIs are healthy. No actions needed. Continue monitoring at current 3s refresh rate.';
-        return `💡 **Recommended Actions:**\n\n${issues.map((k, i) => `${i + 1}. **${k.name}** (${k.status.toUpperCase()}): ${k.status === 'red' ? 'Stop and inspect immediately' : 'Schedule maintenance check'
-            } — current value ${k.value} ${k.unit}`).join('\n')}`;
+        return `💡 **Recommended Actions:**\n\n${issues.map((k, i) => `${i + 1}. **${k.name}** (${k.status.toUpperCase()}): ${k.status === 'red' ? 'Stop and inspect immediately' : 'Schedule maintenance check'} — current value ${k.value} ${k.unit}`).join('\n')}`;
     }
     if (lower.includes('trend') || lower.includes('tendance') || lower.includes('evolution')) {
         return `📈 **KPI Trends (last 5 minutes):**\n\n${kpis.map(k => `• **${k.name}**: ${k.value} ${k.unit} — ${k.status === 'green' ? '↔ Stable' : k.status === 'orange' ? '↗ Rising' : '↑ Critical rise'}`).join('\n')}\n\nRefresh rate: every 3 seconds.`;
@@ -150,7 +104,6 @@ const AI_RESPONSES = (kpis, msg) => {
         const worst = criticals[0] || warnings[0];
         return `🏆 **Performance Summary:**\n\n${best ? `**Best performing:** ${best.name} at ${best.value} ${best.unit} ✅` : ''}\n${worst ? `\n**Needs attention:** ${worst.name} at ${worst.value} ${worst.unit} ${worst.status === 'red' ? '🚨' : '⚠️'}` : ''}`;
     }
-    // Default
     return `🤖 I can help you analyze your digital twin data. Try asking:\n\n• "What is the system status?"\n• "Are there any critical alerts?"\n• "What actions do you recommend?"\n• "Show me KPI trends"\n• "What is the best/worst performing KPI?"`;
 };
 
@@ -166,6 +119,10 @@ const useTwinStore = create((set, get) => ({
     gridRows: 0,
     cellSize: 6,
 
+    // ── Multi-floor state ──────────────────────────────────────────────────────
+    numFloors: 1,      // total floors configured in FormStep
+    activeFloor: 0,    // currently selected floor in GridStep (0-indexed)
+
     twins: [],
     activeTwinId: null,
 
@@ -177,7 +134,7 @@ const useTwinStore = create((set, get) => ({
     hoveredComponentId: null,
     sidebarOpen: true,
     activeView: 'isometric',
-    activePanel: 'kpi',  // 'kpi' | 'charts' | 'chat'
+    activePanel: 'kpi',
 
     chatMessages: [
         { id: 0, role: 'assistant', text: '👋 Hello! I\'m your Analytics AI powered by Llama 3.\n\nConnect your data source first (🔌 Source tab), then ask me anything about your KPIs.' }
@@ -193,6 +150,32 @@ const useTwinStore = create((set, get) => ({
         const cellSize = 6;
         set({ width, length, gridCols: Math.ceil(width / cellSize), gridRows: Math.ceil(length / cellSize), cellSize });
     },
+
+    // ── Floor actions ──────────────────────────────────────────────────────────
+    setNumFloors: (n) => set({ numFloors: Math.max(1, Math.min(10, n)), activeFloor: 0 }),
+    setActiveFloor: (f) => set({ activeFloor: f, selectedComponentId: null }),
+
+    // Add a floor (up to 10). Does NOT reset activeFloor.
+    addFloor: () => set(s => {
+        if (s.numFloors >= 10) return s;
+        return { numFloors: s.numFloors + 1 };
+    }),
+
+    // Remove the last floor. Blocked if it has components — returns false so the
+    // caller can show a warning. Otherwise removes the floor and clamps activeFloor.
+    removeLastFloor: () => {
+        const s = useTwinStore.getState();
+        if (s.numFloors <= 1) return false;
+        const lastFloor = s.numFloors - 1;
+        const blocked = s.components.some(c => (c.floor ?? 0) === lastFloor);
+        if (blocked) return false;
+        useTwinStore.setState({
+            numFloors: s.numFloors - 1,
+            activeFloor: Math.min(s.activeFloor, s.numFloors - 2),
+        });
+        return true;
+    },
+
     resizeGrid: (cols, rows) => set(s => {
         let minCols = 1;
         let minRows = 1;
@@ -202,7 +185,6 @@ const useTwinStore = create((set, get) => ({
             if (w > minCols) minCols = w;
             if (h > minRows) minRows = h;
         });
-        
         const newCols = Math.max(minCols, cols);
         const newRows = Math.max(minRows, rows);
         return { gridCols: newCols, gridRows: newRows, width: newCols * s.cellSize, length: newRows * s.cellSize };
@@ -214,25 +196,25 @@ const useTwinStore = create((set, get) => ({
     setActivePanel: (p) => set({ activePanel: p }),
 
     initScene: () => {
-        const { selectedDomain, gridCols, gridRows } = get();
-        // Start with empty components and connections
-        const components = [];
-        const connections = [];
-        const kpiHistory = [];
-        set({ components, connections, kpis: [], kpiHistory });
+        set({ components: [], connections: [], kpis: [], kpiHistory: [], activeFloor: 0 });
     },
 
     addComponent: (type, overrides = {}) => {
-        const { selectedDomain, gridCols, gridRows, components } = get();
+        const { selectedDomain, gridCols, gridRows, components, activeFloor } = get();
         const bp = getBlueprint(selectedDomain, type) || { name: type, gridSize: [2, 2], color: '#4865f2' };
         const [w, h] = overrides.gridSize || bp.gridSize;
+
+        // Build occupied map for the target floor only
+        const targetFloor = overrides.floor !== undefined ? overrides.floor : activeFloor;
         const occupied = new Set();
-        components.forEach(c => {
-            const [cw, ch] = c.gridSize;
-            for (let r = c.row; r < c.row + ch; r++)
-                for (let cl = c.col; cl < c.col + cw; cl++)
-                    occupied.add(`${r}-${cl}`);
-        });
+        components
+            .filter(c => (c.floor ?? 0) === targetFloor)
+            .forEach(c => {
+                const [cw, ch] = c.gridSize;
+                for (let r = c.row; r < c.row + ch; r++)
+                    for (let cl = c.col; cl < c.col + cw; cl++)
+                        occupied.add(`${r}-${cl}`);
+            });
 
         // If explicit position provided (from AI agent), use it
         if (overrides.row !== undefined && overrides.col !== undefined) {
@@ -244,8 +226,8 @@ const useTwinStore = create((set, get) => ({
                 color: overrides.color || bp.color,
                 col: overrides.col,
                 row: overrides.row,
+                floor: targetFloor,
                 kpiIds: [],
-                // Custom AI-generated component metadata
                 isCustom: overrides.isCustom || false,
                 icon: overrides.icon || '',
                 description: overrides.description || '',
@@ -255,7 +237,7 @@ const useTwinStore = create((set, get) => ({
             return;
         }
 
-        // Auto-place: find first free cell
+        // Auto-place: find first free cell on the target floor
         for (let row = 0; row < gridRows - h + 1; row++) {
             for (let col = 0; col < gridCols - w + 1; col++) {
                 let ok = true;
@@ -263,7 +245,17 @@ const useTwinStore = create((set, get) => ({
                     for (let c = col; c < col + w && ok; c++)
                         if (occupied.has(`${r}-${c}`)) ok = false;
                 if (ok) {
-                    const newComp = { id: `${type}_${++compIdCounter}`, type, name: `${bp.name} ${compIdCounter}`, gridSize: bp.gridSize, color: bp.color, col, row, kpiIds: [] };
+                    const newComp = {
+                        id: `${type}_${++compIdCounter}`,
+                        type,
+                        name: `${bp.name} ${compIdCounter}`,
+                        gridSize: bp.gridSize,
+                        color: bp.color,
+                        col,
+                        row,
+                        floor: targetFloor,
+                        kpiIds: [],
+                    };
                     set(s => ({ components: [...s.components, newComp] }));
                     return;
                 }
@@ -279,98 +271,76 @@ const useTwinStore = create((set, get) => ({
         }));
     },
 
-    removeConnection: (id) => {
-        set(s => ({
-            connections: s.connections.filter(c => c.id !== id)
-        }));
-    },
-
-    addConnection: (sourceId, targetId) => {
-        set(s => {
-            if (sourceId === targetId) return s;
-            if (s.connections.some(c => c.sourceId === sourceId && c.targetId === targetId)) return s;
-            const newConn = { id: `conn_${Date.now()}_${Math.floor(Math.random()*1000)}`, sourceId, targetId, flowStatus: 'green' };
-            return { connections: [...s.connections, newConn] };
-        });
-    },
-
-    moveComponent: (id, newCol, newRow) => {
+    moveComponent: (id, col, row) => {
         set(s => {
             const comp = s.components.find(c => c.id === id);
             if (!comp) return s;
             const [w, h] = comp.gridSize;
+            if (col < 0 || row < 0 || col + w > s.gridCols || row + h > s.gridRows) return s;
+
+            // Check collisions on the same floor only
             const occupied = new Set();
             s.components.forEach(c => {
-                if (c.id === id) return;
+                if (c.id === id || (c.floor ?? 0) !== (comp.floor ?? 0)) return;
                 const [cw, ch] = c.gridSize;
                 for (let r = c.row; r < c.row + ch; r++)
                     for (let cl = c.col; cl < c.col + cw; cl++)
                         occupied.add(`${r}-${cl}`);
             });
-            for (let r = newRow; r < newRow + h; r++)
-                for (let c = newCol; c < newCol + w; c++)
+            for (let r = row; r < row + h; r++)
+                for (let c = col; c < col + w; c++)
                     if (occupied.has(`${r}-${c}`)) return s;
-            if (newCol < 0 || newRow < 0 || newCol + w > s.gridCols || newRow + h > s.gridRows) return s;
-            return { components: s.components.map(c => c.id === id ? { ...c, col: newCol, row: newRow } : c) };
-        });
-    },
 
-    rotateComponent: (id) => {
-        set(s => {
-            const comp = s.components.find(c => c.id === id);
-            if (!comp) return s;
-            const [w, h] = comp.gridSize;
-            const newW = h;
-            const newH = w;
-            
-            const occupied = new Set();
-            s.components.forEach(c => {
-                if (c.id === id) return;
-                const [cw, ch] = c.gridSize;
-                for (let r = c.row; r < c.row + ch; r++)
-                    for (let cl = c.col; cl < c.col + cw; cl++)
-                        occupied.add(`${r}-${cl}`);
-            });
-            
-            for (let r = comp.row; r < comp.row + newH; r++) {
-                for (let c = comp.col; c < comp.col + newW; c++) {
-                    if (c >= s.gridCols || r >= s.gridRows || occupied.has(`${r}-${c}`)) {
-                        return s;
-                    }
-                }
-            }
-            
             return {
-                components: s.components.map(c => 
-                    c.id === id 
-                        ? { ...c, gridSize: [newW, newH], rotation: ((c.rotation || 0) + 90) % 360 } 
-                        : c
+                components: s.components.map(c =>
+                    c.id === id ? { ...c, col, row } : c
                 )
             };
         });
     },
 
-    renameComponent: (id, newName) => {
+    rotateComponent: (id) => {
         set(s => ({
-            components: s.components.map(c => 
-                c.id === id ? { ...c, name: newName } : c
+            components: s.components.map(c =>
+                c.id === id ? { ...c, rotation: ((c.rotation || 0) + 90) % 360 } : c
             )
         }));
+    },
+
+    renameComponent: (id, name) => {
+        set(s => ({
+            components: s.components.map(c => c.id === id ? { ...c, name } : c)
+        }));
+    },
+
+    addConnection: (sourceId, targetId) => {
+        const statuses = ['green', 'orange', 'red'];
+        const flowStatus = statuses[Math.floor(Math.random() * 3)];
+        set(s => ({
+            connections: [...s.connections, {
+                id: `conn_${Date.now()}`,
+                sourceId,
+                targetId,
+                flowStatus,
+                label: '',
+            }]
+        }));
+    },
+
+    removeConnection: (id) => {
+        set(s => ({ connections: s.connections.filter(c => c.id !== id) }));
     },
 
     resizeComponent: (id, newWidth, newHeight) => {
         set(s => {
             const comp = s.components.find(c => c.id === id);
             if (!comp) return s;
-            // Minimum 1x1
             if (newWidth < 1 || newHeight < 1) return s;
-            // Check grid bounds
             if (comp.col + newWidth > s.gridCols || comp.row + newHeight > s.gridRows) return s;
 
-            // Check collisions with other components
             const occupied = new Set();
             s.components.forEach(c => {
-                if (c.id === id) return;
+                if (c.id === id || (c.floor ?? 0) !== (comp.floor ?? 0)) return;
                 const [cw, ch] = c.gridSize;
                 for (let r = c.row; r < c.row + ch; r++)
                     for (let cl = c.col; cl < c.col + cw; cl++)
@@ -385,9 +355,7 @@ const useTwinStore = create((set, get) => ({
 
             return {
                 components: s.components.map(c =>
-                    c.id === id
-                        ? { ...c, gridSize: [newWidth, newHeight] }
-                        : c
+                    c.id === id ? { ...c, gridSize: [newWidth, newHeight] } : c
                 )
             };
         });
@@ -419,9 +387,7 @@ const useTwinStore = create((set, get) => ({
         });
     },
 
-    // Called by the WebSocket hook for each real-time reading from the backend
     updateKpiFromWS: (reading) => {
-        // reading shape: { componentId, kpiName, value, unit, status, source, meta? }
         set(s => {
             const kpiId = `ws_${reading.componentId}_${reading.kpiName}`
                 .replace(/\s+/g, '_').replace(/[^a-z0-9_]/gi, '').toLowerCase();
@@ -431,7 +397,6 @@ const useTwinStore = create((set, get) => ({
             let newComponents = s.components;
 
             if (exists) {
-                // Update existing KPI value + status
                 newKpis = s.kpis.map(k =>
                     k.id === kpiId
                         ? {
@@ -444,8 +409,6 @@ const useTwinStore = create((set, get) => ({
                         : k
                 );
             } else {
-                // First reading for this KPI — register it
-                // Parse rules from the reading meta (set during column assignment)
                 const rules = reading.meta?.rules || {};
                 const newKpi = {
                     id: kpiId,
@@ -463,7 +426,6 @@ const useTwinStore = create((set, get) => ({
                 };
                 newKpis = [...s.kpis, newKpi];
 
-                // Link KPI to its component
                 const comp = s.components.find(c => c.id === reading.componentId);
                 if (comp && !comp.kpiIds?.includes(kpiId)) {
                     newComponents = s.components.map(c =>
@@ -474,7 +436,6 @@ const useTwinStore = create((set, get) => ({
                 }
             }
 
-            // Always update history — add one time-point with ALL current kpi values
             const newPoint = { time: new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) };
             newKpis.forEach(k => { newPoint[k.id] = typeof k.value === 'number' ? +k.value.toFixed(2) : k.value; });
             const newHistory = [...s.kpiHistory.slice(-59), newPoint];
@@ -482,8 +443,6 @@ const useTwinStore = create((set, get) => ({
             return { kpis: newKpis, kpiHistory: newHistory, components: newComponents };
         });
     },
-
-
 
     sendMessage: (text) => {
         const msgId = Date.now();
@@ -502,7 +461,7 @@ const useTwinStore = create((set, get) => ({
     },
 
     loadDemo: () => {
-        set({ selectedDomain: 'factory', twinName: 'Main Production Floor', width: 60, length: 42, gridCols: 10, gridRows: 7, currentStep: 5 });
+        set({ selectedDomain: 'factory', twinName: 'Main Production Floor', width: 60, length: 42, gridCols: 10, gridRows: 7, numFloors: 1, activeFloor: 0, currentStep: 5 });
         get().initScene();
     },
 

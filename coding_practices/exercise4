@@ -1,0 +1,24 @@
+#"counting" problem
+'''The Challenge: Word Frequency (The "Text Analyzer")
+The Goal:
+Given a list of words, return a dictionary where the keys are the words and the values are the number of times each word appears.
+
+Example:
+
+Input: ["apple", "banana", "apple", "cherry", "banana", "apple"]
+
+Output: {"apple": 3, "banana": 2, "cherry": 1}'''
+
+def word_frequency (list):
+    dictionary = {}
+    for w in list:
+        if w in dictionary:
+            dictionary[w] +=1
+        else:
+            dictionary[w]= 1
+    return dictionary
+
+#test it
+my_list= ["apple", "banana", "apple", "orange", "banana", "apple"]
+# result = print(word_frequency(my_list)) # Should print {'apple': 3, 'banana': 2, 'orange': 1}
+print(word_frequency(my_list))

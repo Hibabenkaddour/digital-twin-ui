@@ -3,12 +3,22 @@ import useTwinStore, { DOMAINS } from '../store/useTwinStore';
 import Grid2D from '../components/Grid2D';
 import Scene3D from '../components/Scene3D';
 import { layoutPrompt, saveLayoutState, checkBackendHealth } from '../services/api';
+import { Layers, Plus, Minus } from 'lucide-react';
 
 const VIEWS = ['2D Grid', '3D Preview', 'Split'];
 
+const FLOOR_COLORS = [
+  '#4865f2', '#10b981', '#f59e0b', '#ef4444',
+  '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
+  '#84cc16', '#64748b',
+];
+
 export default function GridStep() {
-  const { selectedDomain, components, connections, kpis, gridCols, gridRows, cellSize,
-          setStep, addComponent, moveComponent, twinName, selectComponent, resizeGrid } = useTwinStore();
+  const {
+    selectedDomain, components, connections, kpis, gridCols, gridRows, cellSize,
+    numFloors, activeFloor, setActiveFloor, addFloor, removeLastFloor,
+    setStep, addComponent, moveComponent, twinName, selectComponent, resizeGrid,
+  } = useTwinStore();
 
   const [view, setView] = useState('Split');
   const [aiPrompt, setAiPrompt] = useState('');
@@ -17,18 +27,24 @@ export default function GridStep() {
   const [backendOnline, setBackendOnline] = useState(false);
   const [showAiBar, setShowAiBar] = useState(false);
   const [justAdded, setJustAdded] = useState(null);
+  const [floorWarn, setFloorWarn] = useState(false);
 
   const domain = DOMAINS[selectedDomain];
   const blueprints = domain?.components || [];
 
+  // Min grid size considering all floors
   let minCols = 1;
   let minRows = 1;
   components.forEach(c => {
-      const w = c.col + c.gridSize[0];
-      const h = c.row + c.gridSize[1];
-      if (w > minCols) minCols = w;
-      if (h > minRows) minRows = h;
+    const w = c.col + c.gridSize[0];
+    const h = c.row + c.gridSize[1];
+    if (w > minCols) minCols = w;
+    if (h > minRows) minRows = h;
   });
+
+  // Count components per floor for badges
+  const countByFloor = (fi) => components.filter(c => (c.floor ?? 0) === fi).length;
+  const activeFloorCount = countByFloor(activeFloor);
 
   useEffect(() => {
     checkBackendHealth().then(setBackendOnline);
@@ -51,7 +67,7 @@ export default function GridStep() {
       domain: selectedDomain || 'factory',
       gridCols: gridCols || 10,
       gridRows: gridRows || 8,
-      components: components.map(c => ({ id: c.id, name: c.name, type: c.type, row: c.row, col: c.col, gridSize: c.gridSize, color: c.color, kpiIds: c.kpiIds || [] })),
+      components: components.map(c => ({ id: c.id, name: c.name, type: c.type, row: c.row, col: c.col, floor: c.floor ?? 0, gridSize: c.gridSize, color: c.color, kpiIds: c.kpiIds || [] })),
       connections: connections.map(c => ({ id: c.id, sourceId: c.sourceId, targetId: c.targetId, label: c.label || '', flowStatus: c.flowStatus || 'green' })),
     };
 
@@ -63,11 +79,11 @@ export default function GridStep() {
       result.newState.components.forEach(comp => {
         const existing = components.find(c => c.id === comp.id);
         if (!existing) {
-          // Pass ALL extra fields for custom components
           store.addComponent(comp.type, {
             row: comp.row, col: comp.col,
             name: comp.name, color: comp.color,
             gridSize: comp.gridSize,
+            floor: comp.floor ?? activeFloor,
             isCustom: comp.isCustom || false,
             icon: comp.icon || '',
             description: comp.description || '',
@@ -79,21 +95,15 @@ export default function GridStep() {
         }
       });
 
-      // Remove deleted components
       components.forEach(c => {
         if (!result.newState.components.find(nc => nc.id === c.id)) {
           useTwinStore.getState().removeComponent?.(c.id);
         }
       });
 
-      setAiResult({
-        explanation: result.explanation,
-        actionsCount: result.actions.length,
-        customCount,
-      });
+      setAiResult({ explanation: result.explanation, actionsCount: result.actions.length, customCount });
       setAiPrompt('');
     } catch (e) {
-      // Fallback: basic local parsing for palette types only
       const p = aiPrompt.toLowerCase();
       blueprints.forEach(bp => {
         if (p.includes(bp.type.replace('_', ' ')) || p.includes(bp.name.toLowerCase())) {
@@ -107,15 +117,18 @@ export default function GridStep() {
     }
   };
 
+  const floorColor = FLOOR_COLORS[activeFloor % FLOOR_COLORS.length];
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Toolbar */}
+
+      {/* ── Top Toolbar ─────────────────────────────────────────────────────── */}
       <div style={{ padding: '7px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-1)', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, flexWrap: 'wrap' }}>
         {/* Component palette */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>+ Add</span>
           {blueprints.map(bp => (
-            <button key={bp.type} onClick={() => handleAdd(bp.type)} title={`Add ${bp.name}`}
+            <button key={bp.type} onClick={() => handleAdd(bp.type)} title={`Add ${bp.name} to Floor ${activeFloor + 1}`}
               style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '7px', cursor: 'pointer', fontSize: '11px', fontWeight: 500, transition: 'all 0.18s',
                 background: justAdded === bp.type ? `${bp.color}30` : 'rgba(255,255,255,0.04)',
                 border: `1px solid ${justAdded === bp.type ? bp.color : 'rgba(255,255,255,0.08)'}`,
@@ -147,11 +160,40 @@ export default function GridStep() {
         </button>
 
         <div style={{ padding: '3px 9px', borderRadius: '16px', background: 'rgba(72,101,242,0.1)', border: '1px solid rgba(72,101,242,0.2)', fontSize: '11px', fontWeight: 600, color: 'var(--accent)', flexShrink: 0 }}>
-          {components.length} components
+          {activeFloorCount} on floor · {components.length} total
+        </div>
+
+        {/* ── Floor +/− controls ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, borderLeft: '1px solid var(--border)', paddingLeft: '10px' }}>
+          <Layers size={12} style={{ color: 'var(--text-2)' }} />
+          <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-2)', marginRight: '2px' }}>
+            {numFloors} floor{numFloors > 1 ? 's' : ''}
+          </span>
+          <button
+            onClick={() => { const ok = removeLastFloor(); if (!ok) { setFloorWarn(true); setTimeout(() => setFloorWarn(false), 2500); } }}
+            disabled={numFloors <= 1}
+            title="Remove last floor (only if empty)"
+            style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: numFloors <= 1 ? 'var(--text-2)' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: numFloors <= 1 ? 'not-allowed' : 'pointer', opacity: numFloors <= 1 ? 0.35 : 1, padding: 0 }}>
+            <Minus size={11} />
+          </button>
+          <button
+            onClick={() => addFloor()}
+            disabled={numFloors >= 10}
+            title="Add a floor"
+            style={{ width: '22px', height: '22px', borderRadius: '5px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: numFloors >= 10 ? 'var(--text-2)' : '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: numFloors >= 10 ? 'not-allowed' : 'pointer', opacity: numFloors >= 10 ? 0.35 : 1, padding: 0 }}>
+            <Plus size={11} />
+          </button>
         </div>
       </div>
 
-      {/* AI Prompt Bar */}
+      {/* Floor removal blocked warning */}
+      {floorWarn && (
+        <div style={{ padding: '6px 14px', background: 'rgba(239,68,68,0.08)', borderBottom: '1px solid rgba(239,68,68,0.2)', fontSize: '11px', color: '#ef4444', flexShrink: 0 }}>
+          ⚠ Floor {numFloors} still has components. Remove them first before deleting this floor.
+        </div>
+      )}
+
+      {/* ── AI Prompt Bar ────────────────────────────────────────────────────── */}
       {showAiBar && (
         <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'rgba(72,101,242,0.03)', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
@@ -159,10 +201,9 @@ export default function GridStep() {
             <div style={{ flex: 1 }}>
               <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAiPrompt(); }}}
-                placeholder='Describe layout changes, e.g. "Add 3 conveyor belts next to the shipping dock" or "Move Assembly Station to row 2, col 5"'
+                placeholder={`Describe layout changes for Floor ${activeFloor + 1}, e.g. "Add 3 conveyor belts next to the shipping dock"`}
                 rows={2}
                 style={{ width: '100%', background: 'var(--bg-0)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 10px', color: 'var(--text-0)', fontSize: '12px', resize: 'none', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-              {/* Quick example prompts */}
               <div style={{ display: 'flex', gap: '5px', marginTop: '5px', flexWrap: 'wrap' }}>
                 {[
                   `Add a fuel tank 3x2`,
@@ -201,11 +242,14 @@ export default function GridStep() {
         </div>
       )}
 
-      {/* Main area */}
+      {/* ── Main area ────────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+
         {/* 2D Grid pane */}
         {(view === '2D Grid' || view === 'Split') && (
           <div style={{ flex: view === 'Split' ? '0 0 50%' : '1', borderRight: view === 'Split' ? '1px solid var(--border)' : 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+
+            {/* 2D Editor header */}
             <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-1)' }}>⬜ 2D EDITOR</span>
               <div style={{ fontSize: '10px', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
@@ -213,19 +257,84 @@ export default function GridStep() {
                 <span style={{ opacity: 0.3 }}>|</span>
                 <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>Grid Size:</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    Width 
-                    <button onClick={() => resizeGrid(gridCols - 1, gridRows)} disabled={gridCols <= minCols} style={{ background: 'var(--bg-2)', opacity: gridCols <= minCols ? 0.3 : 1, border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: gridCols <= minCols ? 'not-allowed' : 'pointer', color: 'var(--text-1)', padding: 0 }}>-</button>
-                    <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{gridCols}</span>
-                    <button onClick={() => resizeGrid(gridCols + 1, gridRows)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-1)', padding: 0 }}>+</button>
+                  Width
+                  <button onClick={() => resizeGrid(gridCols - 1, gridRows)} disabled={gridCols <= minCols} style={{ background: 'var(--bg-2)', opacity: gridCols <= minCols ? 0.3 : 1, border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: gridCols <= minCols ? 'not-allowed' : 'pointer', color: 'var(--text-1)', padding: 0 }}>-</button>
+                  <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{gridCols}</span>
+                  <button onClick={() => resizeGrid(gridCols + 1, gridRows)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-1)', padding: 0 }}>+</button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    Height
-                    <button onClick={() => resizeGrid(gridCols, gridRows - 1)} disabled={gridRows <= minRows} style={{ background: 'var(--bg-2)', opacity: gridRows <= minRows ? 0.3 : 1, border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: gridRows <= minRows ? 'not-allowed' : 'pointer', color: 'var(--text-1)', padding: 0 }}>-</button>
-                    <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{gridRows}</span>
-                    <button onClick={() => resizeGrid(gridCols, gridRows + 1)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-1)', padding: 0 }}>+</button>
+                  Height
+                  <button onClick={() => resizeGrid(gridCols, gridRows - 1)} disabled={gridRows <= minRows} style={{ background: 'var(--bg-2)', opacity: gridRows <= minRows ? 0.3 : 1, border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: gridRows <= minRows ? 'not-allowed' : 'pointer', color: 'var(--text-1)', padding: 0 }}>-</button>
+                  <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{gridRows}</span>
+                  <button onClick={() => resizeGrid(gridCols, gridRows + 1)} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '2px', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-1)', padding: 0 }}>+</button>
                 </div>
               </div>
             </div>
+
+            {/* ── Floor selector tabs (only shown when numFloors > 1) ── */}
+            {numFloors > 1 && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '6px 12px',
+                borderBottom: '1px solid var(--border)',
+                background: 'var(--bg-0)',
+                overflowX: 'auto',
+                flexShrink: 0,
+              }}>
+                <Layers size={12} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
+                <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.07em', marginRight: '4px', flexShrink: 0 }}>Floor</span>
+                {Array.from({ length: numFloors }).map((_, fi) => {
+                  const isActive = fi === activeFloor;
+                  const color = FLOOR_COLORS[fi % FLOOR_COLORS.length];
+                  const count = countByFloor(fi);
+                  return (
+                    <button
+                      key={fi}
+                      onClick={() => setActiveFloor(fi)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 10px',
+                        borderRadius: '20px',
+                        border: isActive ? `1.5px solid ${color}` : '1px solid var(--border)',
+                        background: isActive ? `${color}18` : 'transparent',
+                        color: isActive ? color : 'var(--text-2)',
+                        fontSize: '11px',
+                        fontWeight: isActive ? 700 : 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        flexShrink: 0,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {fi + 1}
+                      {count > 0 && (
+                        <span style={{
+                          fontSize: '9px',
+                          padding: '0 4px',
+                          borderRadius: '8px',
+                          background: isActive ? `${color}30` : 'rgba(148,163,184,0.2)',
+                          color: isActive ? color : 'var(--text-2)',
+                          fontWeight: 700,
+                          minWidth: '14px',
+                          textAlign: 'center',
+                        }}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+                {/* Current floor indicator */}
+                <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--text-2)', flexShrink: 0 }}>
+                  Editing Floor {activeFloor + 1} of {numFloors}
+                </span>
+              </div>
+            )}
+
             <div style={{ flex: 1, overflow: 'auto' }}><Grid2D /></div>
           </div>
         )}
@@ -236,6 +345,11 @@ export default function GridStep() {
             <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-1)' }}>⬡ 3D PREVIEW</span>
               <span style={{ fontSize: '10px', color: 'var(--text-2)' }}>Orbit · Scroll zoom · Ctrl+drag to move</span>
+              {numFloors > 1 && (
+                <span style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px', borderRadius: '8px', background: 'rgba(72,101,242,0.1)', border: '1px solid rgba(72,101,242,0.2)', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Layers size={10} /> {numFloors} floors
+                </span>
+              )}
             </div>
             <div style={{ flex: 1, position: 'relative' }}><Scene3D /></div>
           </div>

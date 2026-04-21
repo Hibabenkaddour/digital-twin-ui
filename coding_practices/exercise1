@@ -1,0 +1,30 @@
+
+'''Given a list of integers nums and an integer target, return the indices of the two numbers such that they add up to the target.
+
+Example:
+
+Input: nums = [2, 7, 11, 15], target = 9
+
+Output: [0, 1] (Because nums[0] + nums[1] == 9)'''
+
+def two_sum (nums,target):
+    # This is our 'logbook' (Hash Map)
+    prev_map={} #dictionary to store previously seen numbers and their indices {number: index}
+    for i, n in enumerate(nums):
+        diff= target - n 
+
+    # Checking if the 'partner' number is already in the logbook
+        if diff in prev_map:
+            print(f"Match found! Partner {diff} was at index {prev_map[diff]}.")
+            return [prev_map[diff], i]
+        # If no partner found, sign into the logbook
+        print(f"No partner for {n} yet. Adding {n} (index {i}) to the logbook.")
+        prev_map[n]=i
+    return []
+
+# Running the example
+my_nums = [3, 5, 2]
+my_target = 5
+
+result = two_sum(my_nums, my_target)
+print(f"Final Result (Indices): {result}")

@@ -1,0 +1,29 @@
+#"counting" problem
+
+''' The Challenge: First Unique Character
+The Goal:
+Given a string (like "leetcoder"), find the first character that does not repeat and return its index. If every character repeats, return -1.
+
+Example:
+
+Input: s = "lovepython"
+
+Output: 2
+(Why? 'l' appears once, 'o' appears twice, 'v' is the next one that appears only once. The index of 'v' is 2.) '''
+
+def first_unique_character(s):
+    count_map={}
+    for char in s:
+        if char in count_map:
+            count_map[char] += 1
+        else:
+            count_map[char]= 1
+    
+    for i, char in enumerate(s):
+        if count_map[char] ==1:
+            return i
+    return -1        
+
+# Test it
+print(first_unique_character("lovepython")) # Should print 0 (because 'l' is unique)
+print(first_unique_character("aab"))
