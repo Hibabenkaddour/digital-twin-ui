@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Text } from '@react-three/drei';
-import { useRef, useMemo, useState, useCallback } from 'react';
+import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import * as THREE from 'three';
 import useTwinStore, { DOMAINS } from '../store/useTwinStore';
 
@@ -859,27 +859,41 @@ function SceneBackground() {
     return null;
 }
 
+function CameraController({ view, cx, cz }) {
+    const { camera } = useThree();
+    useEffect(() => {
+        if (view === 'isometric') camera.position.set(cx + 42, 40, cz + 42);
+        else if (view === 'top') camera.position.set(cx, 85, cz + 0.001);
+        else if (view === 'front') camera.position.set(cx, 10, cz + 70);
+        else if (view === 'free') camera.position.set(cx + 25, 28, cz + 58);
+    }, [view, cx, cz, camera]);
+    return null;
+}
+
 // ─── Main Export ───────────────────────────────────────────────────────────────
-export default function Scene3D() {
+export default function Scene3D({ cameraView }) {
     const { components, connections, kpis, gridCols, gridRows, cellSize, selectedComponentId, hoveredComponentId, selectComponent, hoverComponent, activeView, moveComponent } = useTwinStore();
     const cols = gridCols || 10, rows = gridRows || 8, cs = cellSize || 6;
     const cx = (cols * cs) / 2, cz = (rows * cs) / 2;
 
+    const currentView = cameraView || activeView;
+
     const camPresets = {
         isometric: [cx + 42, 40, cz + 42],
         top: [cx, 85, cz + 0.001],
+        front: [cx, 10, cz + 70],
         free: [cx + 25, 28, cz + 58],
     };
 
     return (
         <Canvas
-            key={activeView}
             shadows
-            camera={{ position: camPresets[activeView] || camPresets.isometric, fov: 45, near: 0.1, far: 1000 }}
+            camera={{ position: camPresets[currentView] || camPresets.isometric, fov: 45, near: 0.1, far: 1000 }}
             style={{ width: '100%', height: '100%' }}
             gl={{ antialias: true, powerPreference: 'high-performance' }}
             onPointerMissed={() => selectComponent(null)}
         >
+            <CameraController view={currentView} cx={cx} cz={cz} />
             <SceneBackground />
             <fog attach="fog" args={['#f4f5f7', 130, 400]} />
             <ambientLight intensity={0.7} />

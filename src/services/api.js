@@ -8,14 +8,31 @@ const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 async function apiFetch(path, options = {}) {
     const res = await fetch(`${BASE_URL}${path}`, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
         ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {}),
+        },
     });
+    
     if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || `API error ${res.status}`);
+        let errStr = `Erreur ${res.status} ${res.statusText}`;
+        try {
+            const txt = await res.text();
+            if (txt) {
+                const j = JSON.parse(txt);
+                errStr = j.detail || errStr;
+            }
+        } catch (e) {}
+        throw new Error(errStr);
     }
-    return res.json();
+    
+    const txt = await res.text();
+    try {
+        return txt ? JSON.parse(txt) : {};
+    } catch(e) {
+        throw new Error("Invalid JSON de l'API: " + txt.substring(0, 50));
+    }
 }
 
 // ─── Layout API ───────────────────────────────────────────────────────────────
@@ -102,6 +119,27 @@ export async function getQueryHistory(limit = 20) {
 
 export async function getQuerySuggestions() {
     return apiFetch('/analytics/suggestions');
+}
+
+// ─── Twins CRUD API ───────────────────────────────────────────────────────────
+
+export async function listTwins() {
+    return apiFetch('/twins');
+}
+
+export async function getTwin(twinId) {
+    return apiFetch(`/twins/${twinId}`);
+}
+
+export async function saveTwin(twinId, state) {
+    return apiFetch(`/twins/${twinId}`, {
+        method: 'PUT',
+        body: JSON.stringify(state),
+    });
+}
+
+export async function deleteTwin(twinId) {
+    return apiFetch(`/twins/${twinId}`, { method: 'DELETE' });
 }
 
 // ─── Health check ─────────────────────────────────────────────────────────────

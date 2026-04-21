@@ -30,8 +30,6 @@ export default function useKpiWebSocket(domain = 'airport') {
   const retryDelay = useRef(1000);
   const mounted = useRef(true);
 
-  const { updateKpiFromWS } = useTwinStore();
-
   const connect = useCallback(() => {
     if (!mounted.current) return;
 
@@ -41,32 +39,30 @@ export default function useKpiWebSocket(domain = 'airport') {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        if (!mounted.current) return;
+        if (!mounted.current || wsRef.current !== ws) return;
         setStatus(STATUS.LIVE);
-        retryDelay.current = 1000; // reset backoff
+        retryDelay.current = 1000;
         console.log('[WS] Connected to KPI stream');
       };
 
       ws.onmessage = (event) => {
-        if (!mounted.current) return;
+        if (!mounted.current || wsRef.current !== ws) return;
         try {
           const msg = JSON.parse(event.data);
 
           if (msg.type === 'ping') {
-            // respond with pong
-            ws.send(JSON.stringify({ type: 'ping' }));
+            ws.send(JSON.stringify({ type: 'pong' }));
             return;
           }
 
           if (msg.type === 'snapshot') {
-            // Apply all latest values at once
-            msg.readings?.forEach(r => updateKpiFromWS?.(r));
+            msg.readings?.forEach(r => useTwinStore.getState().updateKpiFromWS?.(r));
             setLastUpdate(new Date());
             return;
           }
 
           if (msg.type === 'kpi') {
-            updateKpiFromWS?.(msg);
+            useTwinStore.getState().updateKpiFromWS?.(msg);
             setLastUpdate(new Date());
             setMessageCount(c => c + 1);
           }
@@ -76,7 +72,7 @@ export default function useKpiWebSocket(domain = 'airport') {
       };
 
       ws.onclose = () => {
-        if (!mounted.current) return;
+        if (!mounted.current || wsRef.current !== ws) return;
         setStatus(STATUS.RECONNECTING);
         console.log(`[WS] Disconnected — reconnecting in ${retryDelay.current}ms`);
         reconnectTimer.current = setTimeout(() => {
@@ -86,13 +82,13 @@ export default function useKpiWebSocket(domain = 'airport') {
       };
 
       ws.onerror = () => {
-        setStatus(STATUS.OFFLINE);
+        if (!mounted.current || wsRef.current !== ws) return;
         ws.close();
       };
     } catch (e) {
       setStatus(STATUS.OFFLINE);
     }
-  }, [domain, updateKpiFromWS]);
+  }, [domain]);
 
   useEffect(() => {
     mounted.current = true;

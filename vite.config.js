@@ -6,12 +6,13 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/layout':    { target: 'http://localhost:8000', changeOrigin: true },
-      '/kpis':      { target: 'http://localhost:8000', changeOrigin: true },
-      '/analytics': { target: 'http://localhost:8000', changeOrigin: true },
-      '/health':    { target: 'http://localhost:8000', changeOrigin: true },
-      '/source':    { target: 'http://localhost:8000', changeOrigin: true },
-      '/stream':    { target: 'http://localhost:8000', changeOrigin: true },
+      '/layout':    { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/kpis':      { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/analytics': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/health':    { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/source':    { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/stream':    { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/twins':     { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
 
   },

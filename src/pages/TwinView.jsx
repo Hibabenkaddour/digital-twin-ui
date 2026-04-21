@@ -12,6 +12,7 @@
  */
 import { useEffect, useState } from 'react';
 import useTwinStore from '../store/useTwinStore';
+import { Save, CheckCircle } from 'lucide-react';
 import Scene3D from '../components/Scene3D';
 import KpiPanel from '../components/KpiPanel';
 import KpiCharts from '../components/KpiCharts';
@@ -40,10 +41,34 @@ export default function TwinView() {
         activePanel, setActivePanel,
         selectedComponentId, selectComponent,
         twinName, selectedDomain,
+        saveTwinToDb,
     } = useTwinStore();
 
     const [cameraView, setCameraView] = useState('Isometric');
     const [alertsOpen, setAlertsOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveOk, setSaveOk] = useState(false);
+
+    const [toast, setToast] = useState(null); // { type: 'success'|'error', msg }
+
+    const showToast = (type, msg) => {
+        setToast({ type, msg });
+        setTimeout(() => setToast(null), 3500);
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await saveTwinToDb();
+            setSaveOk(true);
+            showToast('success', `"${twinName || 'Digital Twin'}" saved successfully`);
+            setTimeout(() => setSaveOk(false), 2500);
+        } catch {
+            showToast('error', 'Save failed — check that the backend is running');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     // Real-time KPI stream from backend file connector via WebSocket
     const { status: wsStatus, lastUpdate, messageCount, STATUS } = useKpiWebSocket(selectedDomain || 'airport');
@@ -72,6 +97,26 @@ export default function TwinView() {
 
     return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-0)' }}>
+
+            {/* ── Save toast notification ─────────────────────────────────── */}
+            {toast && (
+                <div style={{
+                    position: 'fixed', bottom: '28px', left: '50%', transform: 'translateX(-50%)',
+                    zIndex: 1000, display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '13px 22px', borderRadius: '12px', fontSize: '13px', fontWeight: 600,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+                    background: toast.type === 'success' ? '#0d2e1f' : '#2d1212',
+                    border: `1px solid ${toast.type === 'success' ? '#10d98d55' : '#ef444455'}`,
+                    color: toast.type === 'success' ? '#10d98d' : '#ef4444',
+                    animation: 'fadeInUp 0.25s ease',
+                    whiteSpace: 'nowrap',
+                }}>
+                    {toast.type === 'success'
+                        ? <CheckCircle size={16} />
+                        : <span style={{ fontSize: '15px' }}>⚠</span>}
+                    {toast.msg}
+                </div>
+            )}
 
             {/* ── Top toolbar ─────────────────────────────────────────────── */}
             <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-1)', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, flexWrap: 'wrap' }}>
@@ -111,6 +156,16 @@ export default function TwinView() {
                 <button onClick={() => setAlertsOpen(o => !o)}
                     style={{ padding: '4px 10px', borderRadius: '8px', border: `1px solid ${critKpis.length > 0 ? '#ef4444' : 'var(--border)'}`, background: critKpis.length > 0 ? 'rgba(239,68,68,0.08)' : 'var(--bg-0)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 600, color: critKpis.length > 0 ? '#ef4444' : 'var(--text-2)' }}>
                     🔔 {critKpis.length > 0 ? `${critKpis.length} Critical` : warnKpis.length > 0 ? `${warnKpis.length} Warn` : 'No alerts'}
+                </button>
+
+                {/* Save twin */}
+                <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: '11px', gap: '5px', color: saveOk ? '#10d98d' : undefined, borderColor: saveOk ? '#10d98d55' : undefined }}
+                    onClick={handleSave}
+                    disabled={saving}
+                >
+                    {saveOk ? <><CheckCircle size={13} /> Saved!</> : saving ? <><Save size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</> : <><Save size={13} /> Save Twin</>}
                 </button>
 
                 {/* Back to KPI setup */}

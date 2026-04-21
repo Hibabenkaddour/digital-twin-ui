@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { listTwins, getTwin, saveTwin as apiSaveTwin, deleteTwin as apiDeleteTwin } from '../services/api';
 
 export const DOMAINS = {
     factory: {
@@ -164,6 +165,8 @@ const useTwinStore = create((set, get) => ({
     length: 40,
     gridCols: 0,
     gridRows: 0,
+    minCols: 5,
+    minRows: 4,
     cellSize: 6,
 
     twins: [],
@@ -192,6 +195,10 @@ const useTwinStore = create((set, get) => ({
     setDimensions: (width, length) => {
         const cellSize = 6;
         set({ width, length, gridCols: Math.ceil(width / cellSize), gridRows: Math.ceil(length / cellSize), cellSize });
+    },
+    resizeGrid: (cols, rows) => {
+        const { cellSize } = get();
+        set({ gridCols: cols, gridRows: rows, width: cols * cellSize, length: rows * cellSize });
     },
     selectComponent: (id) => set({ selectedComponentId: id }),
     hoverComponent: (id) => set({ hoveredComponentId: id }),
@@ -442,6 +449,84 @@ const useTwinStore = create((set, get) => ({
         const { twinName, selectedDomain, width, length, gridCols, gridRows } = get();
         const newTwin = { id: `twin_${Date.now()}`, name: twinName || `${DOMAINS[selectedDomain]?.label} Twin`, domain: selectedDomain, width, length, gridCols, gridRows, modified: new Date().toISOString() };
         set(s => ({ twins: [...s.twins, newTwin], activeTwinId: newTwin.id }));
+    },
+
+    // ─── DB-persisted twin CRUD ────────────────────────────────────────────────
+
+    fetchTwins: async () => {
+        try {
+            const data = await listTwins();
+            set({ twins: data });
+        } catch (e) {
+            console.warn('Could not fetch twins from backend:', e.message);
+        }
+    },
+
+    saveTwinToDb: async () => {
+        const { activeTwinId, twinName, selectedDomain, width, length, gridCols, gridRows, components, connections } = get();
+        const id = activeTwinId || `twin_${Date.now()}`;
+        const state = {
+            id,
+            name: twinName || `${DOMAINS[selectedDomain]?.label} Twin`,
+            domain: selectedDomain,
+            width,
+            length,
+            gridCols,
+            gridRows,
+            components,
+            connections,
+        };
+        try {
+            const saved = await apiSaveTwin(id, state);
+            set(s => ({
+                activeTwinId: id,
+                twins: s.twins.some(t => t.id === id)
+                    ? s.twins.map(t => t.id === id ? saved : t)
+                    : [...s.twins, saved],
+            }));
+            return saved;
+        } catch (e) {
+            console.error('Failed to save twin:', e.message);
+            throw e;
+        }
+    },
+
+    deleteTwinFromDb: async (twinId) => {
+        try {
+            await apiDeleteTwin(twinId);
+            set(s => ({
+                twins: s.twins.filter(t => t.id !== twinId),
+                activeTwinId: s.activeTwinId === twinId ? null : s.activeTwinId,
+            }));
+        } catch (e) {
+            console.error('Failed to delete twin:', e.message);
+            throw e;
+        }
+    },
+
+    loadTwinFromDb: async (twinId, targetStep = 5) => {
+        try {
+            const state = await getTwin(twinId);
+            const cellSize = 6;
+            set({
+                activeTwinId: twinId,
+                twinName: state.name,
+                selectedDomain: state.domain,
+                width: state.width,
+                length: state.length,
+                gridCols: state.gridCols,
+                gridRows: state.gridRows,
+                cellSize,
+                components: state.components || [],
+                connections: state.connections || [],
+                kpis: [],
+                kpiHistory: [],
+                currentStep: targetStep,
+            });
+        } catch (e) {
+            console.error('Failed to load twin:', e.message);
+            throw e;
+        }
     },
 
     loadDemo: () => {

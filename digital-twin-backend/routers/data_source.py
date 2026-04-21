@@ -80,18 +80,19 @@ def get_schema(domain: str = Query("factory")):
     Fetch the column list from the postgres database for the requested domain.
     """
     cols = get_db_columns(domain)
-    _source_state["columns"] = cols
-    _source_state["domain"] = domain
+    
+    saved_domain = _source_state.get("domain", "factory")
+    returned_assignments = _source_state.get("assignments", {}) if saved_domain == domain else {}
     
     return {
         "domain": domain,
         "columns": cols,
-        "assignments": _source_state.get("assignments", {}),
+        "assignments": returned_assignments,
         "streaming": _source_state.get("streaming", False),
     }
 
 @router.post("/assign")
-def assign_columns(payload: AssignmentsPayload):
+async def assign_columns(payload: AssignmentsPayload):
     """
     Save the user-defined mathematical KPIs mapping.
     """

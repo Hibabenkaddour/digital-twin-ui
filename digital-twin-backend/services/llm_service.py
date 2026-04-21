@@ -48,10 +48,10 @@ def _try_build_llm():
             # Test connectivity
             _llm.invoke("ping")
             _llm_ready = True
-            print(f"✅ Groq LLM ready: {groq_model}")
+            print(f"[OK] Groq LLM ready: {groq_model}")
             return _llm
         except Exception as e:
-            print(f"⚠️  Groq unavailable: {e}")
+            print(f"[WARNING] Groq unavailable: {e}")
             _llm_ready = False
             return None
 
@@ -66,7 +66,7 @@ def _try_build_llm():
             _llm_ready = True
             return _llm
         except Exception as e:
-            print(f"⚠️  OpenAI unavailable: {e}")
+            print(f"[WARNING] OpenAI unavailable: {e}")
             _llm_ready = False
             return None
 
@@ -79,10 +79,10 @@ def _try_build_llm():
             llm.invoke("ping")
             _llm = llm
             _llm_ready = True
-            print(f"✅ Ollama LLM ready: {OLLAMA_MODEL} @ {OLLAMA_BASE_URL}")
+            print(f"[OK] Ollama LLM ready: {OLLAMA_MODEL} @ {OLLAMA_BASE_URL}")
             return _llm
         except Exception as e:
-            print(f"⚠️  Ollama unavailable ({e}) — using mock fallback. Start Ollama and run: ollama pull {OLLAMA_MODEL}")
+            print(f"[WARNING] Ollama unavailable ({e}) — using mock fallback. Start Ollama and run: ollama pull {OLLAMA_MODEL}")
             _llm_ready = False
             return None
 
@@ -140,7 +140,7 @@ async def llm_json_call(system_prompt: str, user_message: str, fallback_fn=None)
         json_str = _extract_json(content)
         return json.loads(json_str)
     except Exception as e:
-        print(f"⚠️  LLM JSON parse error: {e} — using fallback")
+        print(f"[WARNING] LLM JSON parse error: {e} — using fallback")
         if fallback_fn:
             return fallback_fn(user_message)
         return {"error": str(e)}
@@ -161,7 +161,7 @@ async def llm_text_call(system_prompt: str, user_message: str, fallback_fn=None)
         response = await llm.ainvoke(messages)
         return response.content if hasattr(response, "content") else str(response)
     except Exception as e:
-        print(f"⚠️  LLM text error: {e}")
+        print(f"[WARNING] LLM text error: {e}")
         if fallback_fn:
             return fallback_fn(user_message)
         return f"LLM error: {e}"

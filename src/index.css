@@ -152,6 +152,7 @@ html, body, #root {
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateX(-50%) translateY(16px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 @keyframes glow-pulse { 0%, 100% { box-shadow: var(--glow); } 50% { box-shadow: 0 0 48px rgba(72,101,242,0.4); } }
 
 .animate-fade { animation: fadeIn 0.35s ease both; }

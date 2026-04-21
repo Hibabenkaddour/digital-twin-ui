@@ -3,7 +3,7 @@ import { ChevronRight, ArrowLeft, Database, Plus, Trash2, Zap, Palette, Focus } 
 import useTwinStore from '../store/useTwinStore';
 import { proposeKpis } from '../services/api';
 
-const BASE_URL = 'http://localhost:8000';  // Adjust if needed, Vite proxy assumes same host if empty but backend is 8000 usually
+const BASE_URL = '';
 
 export default function KpiStep() {
     const { setStep, components, selectedDomain } = useTwinStore();
@@ -17,7 +17,11 @@ export default function KpiStep() {
     useEffect(() => {
         // Fetch DB schema for current domain
         fetch(`${BASE_URL}/source/schema?domain=${selectedDomain}`)
-            .then(r => r.json())
+            .then(async r => {
+                if (!r.ok) throw new Error(`Status ${r.status}`);
+                const txt = await r.text();
+                return txt ? JSON.parse(txt) : {};
+            })
             .then(data => {
                 setColumns(data.columns || []);
                 // Convert dictionary assignments to array for the builder
@@ -107,7 +111,16 @@ export default function KpiStep() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ domain: selectedDomain, assignments: valid }),
             });
-            if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Save failed'); }
+            if (!res.ok) { 
+                const txt = await res.text();
+                let errMsg = 'Save failed';
+                try { 
+                    errMsg = JSON.parse(txt).detail || errMsg; 
+                } catch(err) {
+                    errMsg = txt || `HTTP Error ${res.status}`;
+                }
+                throw new Error(errMsg); 
+            }
             
             // Clear local KPI cache in Zustand so Live View isn't stale
             useTwinStore.getState().clearKpis();

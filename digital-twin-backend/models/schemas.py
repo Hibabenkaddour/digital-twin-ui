@@ -30,10 +30,27 @@ class LayoutStateSchema(BaseModel):
     id: str = "default"
     name: str = "Digital Twin"
     domain: str = "factory"
+    width: float = 60.0
+    length: float = 40.0
     gridCols: int = 10
     gridRows: int = 8
     components: list[ComponentSchema] = []
     connections: list[ConnectionSchema] = []
+    createdAt: Optional[datetime] = None
+    updatedAt: Optional[datetime] = None
+
+
+class TwinSummary(BaseModel):
+    id: str
+    name: str
+    domain: str
+    width: float
+    length: float
+    gridCols: int
+    gridRows: int
+    componentCount: int
+    connectionCount: int
+    createdAt: Optional[datetime] = None
     updatedAt: Optional[datetime] = None
 
 class LayoutPromptRequest(BaseModel):

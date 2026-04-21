@@ -11,11 +11,31 @@ def get_layout(db: Session, layout_id: str = "default") -> LayoutStateDB | None:
     return db.query(LayoutStateDB).filter(LayoutStateDB.id == layout_id).first()
 
 
+def list_twins(db: Session) -> list[LayoutStateDB]:
+    return (
+        db.query(LayoutStateDB)
+        .filter(LayoutStateDB.id != "default")
+        .order_by(LayoutStateDB.updated_at.desc())
+        .all()
+    )
+
+
+def delete_twin(db: Session, twin_id: str) -> bool:
+    twin = db.query(LayoutStateDB).filter(LayoutStateDB.id == twin_id).first()
+    if not twin:
+        return False
+    db.delete(twin)
+    db.commit()
+    return True
+
+
 def save_layout(db: Session, state: LayoutStateSchema) -> LayoutStateDB:
     existing = get_layout(db, state.id)
     if existing:
         existing.name = state.name
         existing.domain = state.domain
+        existing.width = state.width
+        existing.length = state.length
         existing.grid_cols = state.gridCols
         existing.grid_rows = state.gridRows
         existing.components_json = json.dumps([c.model_dump() for c in state.components])
@@ -29,6 +49,8 @@ def save_layout(db: Session, state: LayoutStateSchema) -> LayoutStateDB:
             id=state.id,
             name=state.name,
             domain=state.domain,
+            width=state.width,
+            length=state.length,
             grid_cols=state.gridCols,
             grid_rows=state.gridRows,
             components_json=json.dumps([c.model_dump() for c in state.components]),
@@ -46,10 +68,13 @@ def layout_db_to_schema(db_layout: LayoutStateDB) -> LayoutStateSchema:
         id=db_layout.id,
         name=db_layout.name,
         domain=db_layout.domain,
+        width=getattr(db_layout, "width", 60.0) or 60.0,
+        length=getattr(db_layout, "length", 40.0) or 40.0,
         gridCols=db_layout.grid_cols,
         gridRows=db_layout.grid_rows,
         components=[ComponentSchema(**c) for c in json.loads(db_layout.components_json or "[]")],
         connections=[ConnectionSchema(**c) for c in json.loads(db_layout.connections_json or "[]")],
+        createdAt=db_layout.created_at,
         updatedAt=db_layout.updated_at,
     )
 

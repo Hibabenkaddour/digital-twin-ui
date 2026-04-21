@@ -25,6 +25,8 @@ class LayoutStateDB(Base):
     id = Column(String, primary_key=True, default="default")
     name = Column(String, default="Digital Twin")
     domain = Column(String, default="factory")
+    width = Column(Float, default=60.0)
+    length = Column(Float, default=40.0)
     grid_cols = Column(Integer, default=10)
     grid_rows = Column(Integer, default=8)
     components_json = Column(Text, default="[]")

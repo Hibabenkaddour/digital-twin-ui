@@ -1,9 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, Component } from 'react';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, AreaChart, Area, BarChart, Bar, Legend, ReferenceLine
 } from 'recharts';
 import useTwinStore from '../store/useTwinStore';
+
+class ChartErrorBoundary extends Component {
+    constructor(props) { super(props); this.state = { error: false }; }
+    static getDerivedStateFromError() { return { error: true }; }
+    componentDidCatch() { this.setState({ error: false }); } // auto-reset on next render
+    render() {
+        if (this.state.error) return (
+            <div style={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', fontSize: '11px' }}>
+                Chart unavailable
+            </div>
+        );
+        return this.props.children;
+    }
+}
 
 const PALETTE = ['#4865f2', '#10d98d', '#f59e0b', '#f4723e', '#ef4444', '#06b6d4', '#f472b6', '#a3e635'];
 const STATUS_COLOR = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
@@ -119,8 +133,53 @@ export default function KpiCharts() {
                 const redThreshold    = kpi.rules?.red?.[0];
 
                 // Determine which chart component to use
-                const ChartComp  = chartType === 'bar' ? BarChart : AreaChart;
-                const SeriesComp = chartType === 'bar' ? Bar : Area;
+                let chartElement = null;
+
+                const commonAxes = (
+                    <>
+                        <CartesianGrid strokeDasharray="2 4" stroke="#1e3a5f" vertical={false} />
+                        <XAxis dataKey="time" tick={{ fontSize: 8, fill: '#475569' }} tickLine={false} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 8, fill: '#475569' }} tickLine={false} axisLine={false} />
+                        <Tooltip content={<Tip />} />
+                        {orangeThreshold != null && (
+                            <ReferenceLine y={orangeThreshold} stroke="#f59e0b" strokeDasharray="4 3" strokeWidth={1}
+                                label={{ value: `⚠ ${orangeThreshold}`, fontSize: 8, fill: '#f59e0b', position: 'right' }} />
+                        )}
+                        {redThreshold != null && (
+                            <ReferenceLine y={redThreshold} stroke="#ef4444" strokeDasharray="4 3" strokeWidth={1}
+                                label={{ value: `🔴 ${redThreshold}`, fontSize: 8, fill: '#ef4444', position: 'right' }} />
+                        )}
+                    </>
+                );
+
+                if (chartType === 'bar') {
+                    chartElement = (
+                        <BarChart data={chartData} margin={{ top: 6, right: 4, left: -20, bottom: 0 }}>
+                            {commonAxes}
+                            <Bar dataKey={kpi.id} name={kpi.name} fill={color} isAnimationActive={false} />
+                        </BarChart>
+                    );
+                } else if (chartType === 'line') {
+                    chartElement = (
+                        <LineChart data={chartData} margin={{ top: 6, right: 4, left: -20, bottom: 0 }}>
+                            {commonAxes}
+                            <Line type="monotone" dataKey={kpi.id} name={kpi.name} stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 3, fill: color }} />
+                        </LineChart>
+                    );
+                } else {
+                    chartElement = (
+                        <AreaChart data={chartData} margin={{ top: 6, right: 4, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id={`g_${kpi.id}`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor={color} stopOpacity={0.35} />
+                                    <stop offset="95%" stopColor={color} stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            {commonAxes}
+                            <Area type="monotone" dataKey={kpi.id} name={kpi.name} stroke={color} strokeWidth={2} fill={`url(#g_${kpi.id})`} dot={false} activeDot={{ r: 3, fill: color }} />
+                        </AreaChart>
+                    );
+                }
 
                 return (
                     <div key={kpi.id} style={{ background: 'var(--bg-0)', border: `1px solid ${sc}22`, borderRadius: '10px', padding: '10px', flexShrink: 0 }}>
@@ -143,41 +202,11 @@ export default function KpiCharts() {
                                 Waiting for data…
                             </div>
                         ) : (
-                            <ResponsiveContainer width="100%" height={100}>
-                                <ChartComp data={chartData} margin={{ top: 6, right: 4, left: -20, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id={`g_${kpi.id}`} x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%"  stopColor={color} stopOpacity={0.35} />
-                                            <stop offset="95%" stopColor={color} stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="2 4" stroke="#1e3a5f" vertical={false} />
-                                    <XAxis dataKey="time" tick={{ fontSize: 8, fill: '#475569' }} tickLine={false} interval="preserveStartEnd" />
-                                    <YAxis tick={{ fontSize: 8, fill: '#475569' }} tickLine={false} axisLine={false} />
-                                    <Tooltip content={<Tip />} />
-
-                                    {/* Threshold reference lines */}
-                                    {orangeThreshold != null && (
-                                        <ReferenceLine y={orangeThreshold} stroke="#f59e0b" strokeDasharray="4 3" strokeWidth={1}
-                                            label={{ value: `⚠ ${orangeThreshold}`, fontSize: 8, fill: '#f59e0b', position: 'right' }} />
-                                    )}
-                                    {redThreshold != null && (
-                                        <ReferenceLine y={redThreshold} stroke="#ef4444" strokeDasharray="4 3" strokeWidth={1}
-                                            label={{ value: `🔴 ${redThreshold}`, fontSize: 8, fill: '#ef4444', position: 'right' }} />
-                                    )}
-
-                                    <SeriesComp
-                                        type="monotone"
-                                        dataKey={kpi.id}
-                                        name={kpi.name}
-                                        stroke={color}
-                                        strokeWidth={2}
-                                        fill={chartType !== 'bar' ? `url(#g_${kpi.id})` : color}
-                                        dot={false}
-                                        activeDot={{ r: 3, fill: color }}
-                                    />
-                                </ChartComp>
-                            </ResponsiveContainer>
+                            <ChartErrorBoundary>
+                                <ResponsiveContainer width="100%" height={100}>
+                                    {chartElement}
+                                </ResponsiveContainer>
+                            </ChartErrorBoundary>
                         )}
 
                         {/* Threshold legend */}

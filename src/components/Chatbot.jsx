@@ -15,14 +15,15 @@ export default function Chatbot() {
   const [timeRange, setTimeRange] = useState('24h');
   const bottomRef = useRef();
 
-  // Check backend health + load suggestions
+  // Check backend health + load suggestions (re-check every 30s)
   useEffect(() => {
-    checkBackendHealth().then(online => {
+    const check = () => checkBackendHealth().then(online => {
       setBackendOnline(online);
-      if (online) {
-        getQuerySuggestions().then(s => setSuggestions(s.map(x => x.text))).catch(() => {});
-      }
+      if (online) getQuerySuggestions().then(s => setSuggestions(s.map(x => x.text))).catch(() => {});
     });
+    check();
+    const id = setInterval(check, 30_000);
+    return () => clearInterval(id);
   }, []);
 
   // Default suggestions when no data
