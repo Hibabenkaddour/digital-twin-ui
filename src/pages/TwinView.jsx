@@ -265,6 +265,7 @@ export default function TwinView() {
     activePanel, setActivePanel,
     selectedComponentId, selectComponent,
     twinName, selectedDomain,
+    saveSession, sessionSaved,
   } = useTwinStore();
 
   const [cameraView, setCameraView] = useState('Isometric');
@@ -327,6 +328,20 @@ export default function TwinView() {
         </button>
 
         <button className="btn btn-ghost" style={{ fontSize: '11px' }} onClick={() => setStep(4)}>← KPI Setup</button>
+
+        {/* Save button */}
+        <button
+          onClick={saveSession}
+          style={{
+            padding: '4px 12px', borderRadius: '8px', border: `1px solid ${sessionSaved ? '#10d98d' : 'rgba(72,101,242,0.3)'}`,
+            background: sessionSaved ? 'rgba(16,217,141,0.12)' : 'rgba(72,101,242,0.08)',
+            color: sessionSaved ? '#10d98d' : 'var(--accent)',
+            cursor: 'pointer', fontSize: '11px', fontWeight: 700,
+            transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '5px',
+          }}
+        >
+          {sessionSaved ? '✅ Saved!' : '💾 Save'}
+        </button>
       </div>
 
       {/* ── Alert dropdown ── */}

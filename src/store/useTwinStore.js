@@ -62,6 +62,10 @@ const useTwinStore = create((set, get) => ({
   hoveredComponentId: null,
   activePanel: 'kpi',
 
+  // Persisted sessions (localStorage)
+  savedSessions: (() => { try { return JSON.parse(localStorage.getItem('dt2_sessions') || '[]'); } catch { return []; } })(),
+  sessionSaved: false,   // flash feedback flag
+
   chatMessages: [
     { id: 0, role: 'assistant', text: '👋 Hello! I\'m your Analytics AI.\n\nAsk me anything about your digital twin KPIs.' }
   ],
@@ -313,6 +317,59 @@ const useTwinStore = create((set, get) => ({
     set({ selectedDomain: 'factory', twinName: 'Main Production Floor', width: 60, length: 42, gridCols: 10, gridRows: 7, currentStep: 5 });
     get().initScene();
   },
+
+  // ─── Session persistence ──────────────────────────────────────
+  saveSession: () => {
+    const s = get();
+    const id = `session_${Date.now()}`;
+    const session = {
+      id,
+      name: s.twinName || 'Unnamed Twin',
+      domain: s.selectedDomain || 'factory',
+      savedAt: new Date().toISOString(),
+      stats: {
+        components: s.components.length,
+        connections: s.connections.length,
+        kpis: s.kpis.length,
+      },
+      snapshot: {
+        twinName: s.twinName,
+        selectedDomain: s.selectedDomain,
+        width: s.width, length: s.length,
+        gridCols: s.gridCols, gridRows: s.gridRows, cellSize: s.cellSize,
+        components: s.components,
+        connections: s.connections,
+        kpis: s.kpis,
+        activePanel: s.activePanel,
+      },
+    };
+    const existing = (() => { try { return JSON.parse(localStorage.getItem('dt2_sessions') || '[]'); } catch { return []; } })();
+    // Replace if same name+domain, otherwise prepend
+    const idx = existing.findIndex(e => e.name === session.name && e.domain === session.domain);
+    if (idx >= 0) existing[idx] = session; else existing.unshift(session);
+    const updated = existing.slice(0, 10);
+    localStorage.setItem('dt2_sessions', JSON.stringify(updated));
+    set({ savedSessions: updated, sessionSaved: true });
+    setTimeout(() => set({ sessionSaved: false }), 2500);
+  },
+
+  loadSession: (id) => {
+    const sessions = (() => { try { return JSON.parse(localStorage.getItem('dt2_sessions') || '[]'); } catch { return []; } })();
+    const session = sessions.find(s => s.id === id);
+    if (!session?.snapshot) return;
+    set({
+      ...session.snapshot,
+      currentStep: 5,
+      kpiHistory: [],
+      selectedComponentId: null,
+    });
+  },
+
+  deleteSession: (id) => set(s => {
+    const updated = s.savedSessions.filter(x => x.id !== id);
+    localStorage.setItem('dt2_sessions', JSON.stringify(updated));
+    return { savedSessions: updated };
+  }),
 }));
 
 export default useTwinStore;
