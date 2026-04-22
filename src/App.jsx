@@ -4,6 +4,7 @@ import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
 import '@fontsource/inter/800.css';
 import '@fontsource/inter/900.css';
+import { Routes, Route } from 'react-router-dom';
 import useTwinStore from './store/useTwinStore';
 import Navbar from './components/Navbar';
 import HomePage from './pages/HomePage';
@@ -15,7 +16,8 @@ import TwinView from './pages/TwinView';
 import DataSourceWizard from './pages/DataSourceWizard';
 import PublishedView from './pages/PublishedView';
 
-export default function App() {
+/* ── Admin app (step-based navigation) ── */
+function AdminApp() {
   const { currentStep } = useTwinStore();
 
   const renderPage = () => {
@@ -27,7 +29,6 @@ export default function App() {
       case 4: return <KpiStep />;
       case 5: return <TwinView />;
       case 6: return <DataSourceWizard />;
-      case 7: return <PublishedView />;
       default: return <HomePage />;
     }
   };
@@ -43,5 +44,28 @@ export default function App() {
         {renderPage()}
       </div>
     </div>
+  );
+}
+
+/* ── Published viewer (standalone URL route) ── */
+function PublishedApp() {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      height: '100vh', width: '100vw',
+      overflow: 'hidden', background: 'var(--bg-0)',
+    }}>
+      <PublishedView />
+    </div>
+  );
+}
+
+/* ── Root Router ── */
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/view/:pubId" element={<PublishedApp />} />
+      <Route path="/*" element={<AdminApp />} />
+    </Routes>
   );
 }

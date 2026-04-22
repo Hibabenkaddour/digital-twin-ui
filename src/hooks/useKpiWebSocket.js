@@ -2,9 +2,14 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import useTwinStore from '../store/useTwinStore';
 
 const WS_URL = (domain = 'factory') => {
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-  const wsBase  = baseUrl.replace(/^http/, 'ws');
-  return `${wsBase}/ws/kpis?domain=${domain}`;
+  // In dev: VITE_API_URL = 'http://localhost:8000' → ws://localhost:8000/ws/...
+  // In prod: no env var → use current browser host with ws:// or wss://
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) {
+    return `${envUrl.replace(/^http/, 'ws')}/ws/kpis?domain=${domain}`;
+  }
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${window.location.host}/ws/kpis?domain=${domain}`;
 };
 
 const STATUS = {

@@ -21,7 +21,7 @@ function timeAgo(iso) {
 }
 
 export default function HomePage() {
-  const { setStep, loadDemo, twins, savedSessions, loadSession, deleteSession, viewPublished } = useTwinStore();
+  const { setStep, loadDemo, twins, savedSessions, loadSession, deleteSession } = useTwinStore();
   const [published, setPublished] = useState([]);
   const BASE = import.meta.env.VITE_API_URL || '';
 
@@ -45,7 +45,7 @@ export default function HomePage() {
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
           <span className="badge badge-blue" style={{ padding: '6px 16px', fontSize: '12px' }}>
             <Sparkles size={12} />
-            Nexus 3D · Digital Twin Platform
+            DXC Intelligent Analytics
           </span>
         </div>
 
@@ -174,7 +174,7 @@ export default function HomePage() {
                   }}
                   onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 28px ${dc}22`; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
-                  onClick={() => viewPublished(pub.id)}
+                  onClick={() => window.open(`/view/${pub.id}`, '_blank')}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                     <span style={{ fontSize: '26px' }}>{DOMAIN_ICONS[pub.domain] || '📊'}</span>

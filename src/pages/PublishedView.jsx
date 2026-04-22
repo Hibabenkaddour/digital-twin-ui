@@ -1,13 +1,19 @@
 /**
  * PublishedView.jsx
- * Read-only viewer for published dashboards.
- * - Locked layout (no editing)
- * - Live data via WebSocket
- * - NLQ Chat with Groq (same as TwinView)
- * - 3D Scene with live overlays
- * - Responsive toolbar + KPI/Charts/AI panels
+ * ─────────────────
+ * Standalone published dashboard viewer — accessed via /view/:pubId
+ * This is what employees see when a manager shares a link.
+ *
+ * Features:
+ *  ✅ Loads frozen config (components, connections, KPIs) from API
+ *  ✅ Real-time data via WebSocket (useKpiWebSocket)
+ *  ✅ NLQ Chat powered by Groq (same /nlq/ask endpoint)
+ *  ✅ Charts from live PostgreSQL data
+ *  ✅ Interactive 3D Digital Twin (Scene3D)
+ *  ✅ Read-only — no editing, no admin controls
  */
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, BarChart, Bar, AreaChart, Area
@@ -19,13 +25,15 @@ import useKpiWebSocket from '../hooks/useKpiWebSocket';
 const BASE = import.meta.env.VITE_API_URL || '';
 const STATUS_COLORS = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
 const DOMAIN_ICONS = { factory: '🏭', airport: '✈️', warehouse: '📦' };
+const CHART_COLORS = ['#4865f2', '#10d98d', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+
 
 /* ════════════════════════════════════════════════════════════
-   NLQ Chat (reused Groq integration — same as TwinView)
+   NLQ Chat (Groq — reused from TwinView)
    ════════════════════════════════════════════════════════════ */
 function ViewerChat({ domain }) {
   const [messages, setMessages] = useState([
-    { id: 0, role: 'assistant', text: '👋 **Analytics AI** powered by Groq\n\nAsk anything about the live data — I\'ll analyze it and generate charts.\n\nTry clicking a suggestion below.' }
+    { id: 0, role: 'assistant', text: '👋 **Analytics AI** powered by Groq\n\nAsk anything about the live data — I\'ll analyze and generate charts.\n\nTry a suggestion below.' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -140,7 +148,7 @@ function ViewerChat({ domain }) {
    KPI Cards (view-only)
    ════════════════════════════════════════════════════════════ */
 function ViewerKpis({ kpis, components }) {
-  if (kpis.length === 0) return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-2)', fontSize: '13px' }}>📊 No KPI data yet</div>;
+  if (kpis.length === 0) return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-2)', fontSize: '13px' }}>📊 Waiting for live data…</div>;
   const byComp = {};
   kpis.forEach(k => {
     const comp = components.find(c => c.kpiIds?.includes(k.id));
@@ -178,46 +186,114 @@ function ViewerKpis({ kpis, components }) {
 
 
 /* ════════════════════════════════════════════════════════════
-   Published View — Main Export
+   Charts Panel (live data from /analytics/chart-data)
+   ════════════════════════════════════════════════════════════ */
+function ViewerCharts({ domain }) {
+  const [chartData, setChartData] = useState([]);
+
+  const fetchCharts = () => {
+    fetch(`${BASE}/analytics/chart-data?domain=${domain}&limit=30`)
+      .then(r => r.ok ? r.json() : { rows: [] })
+      .then(d => setChartData(d.rows || []))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchCharts();
+    const t = setInterval(fetchCharts, 30000);
+    return () => clearInterval(t);
+  }, [domain]);
+
+  if (chartData.length === 0) {
+    return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-2)', fontSize: '13px' }}>📈 Waiting for chart data…</div>;
+  }
+
+  const numericKeys = Object.keys(chartData[0]).filter(k =>
+    k !== 'id' && k !== 'recorded_at' && k !== 'flow_status' && typeof chartData[0][k] === 'number'
+  );
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
+      {numericKeys.map((key, i) => (
+        <div key={key} style={{ marginBottom: '14px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+            {key.replace(/_/g, ' ')}
+          </div>
+          <div style={{ background: 'var(--bg-0)', borderRadius: '10px', padding: '8px', border: '1px solid var(--border)' }}>
+            <ResponsiveContainer width="100%" height={100}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(72,101,242,0.06)" />
+                <XAxis dataKey="recorded_at" tick={false} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 8, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '10px' }} />
+                <Line dataKey={key} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={false} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   PublishedView — Main Export (standalone, URL-routed)
    ════════════════════════════════════════════════════════════ */
 export default function PublishedView() {
-  const {
-    publishedId, kpis, kpiHistory, components, connections,
-    updateKpiValues, selectedDomain, setStep, twinName,
-  } = useTwinStore();
+  const { pubId } = useParams();  // ← from URL: /view/:pubId
+  const { updateKpiValues } = useTwinStore();
 
   const [dashboard, setDashboard] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [panel, setPanel] = useState('kpi');
   const [cameraView, setCameraView] = useState('Isometric');
 
-  const domain = dashboard?.domain || selectedDomain || 'factory';
-  const { status: wsStatus, lastUpdate, messageCount, STATUS } = useKpiWebSocket(domain);
+  // Local state for the frozen config (not stored in Zustand)
+  const [components, setComponents] = useState([]);
+  const [connections, setConnections] = useState([]);
+  const [kpis, setKpis] = useState([]);
+  const [domain, setDomain] = useState('factory');
 
-  // Load published dashboard config
+  // Load published dashboard from API
   useEffect(() => {
-    if (!publishedId) return;
-    fetch(`${BASE}/publish/${publishedId}`)
-      .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
+    if (!pubId) return;
+    setLoading(true);
+    fetch(`${BASE}/publish/${pubId}`)
+      .then(r => { if (!r.ok) throw new Error('Dashboard not found'); return r.json(); })
       .then(data => {
         setDashboard(data);
-        // Restore the frozen state into the store
+        setDomain(data.domain || 'factory');
         if (data.config) {
-          const s = useTwinStore.getState();
-          if (data.config.components) s.components = data.config.components;
-          if (data.config.connections) s.connections = data.config.connections;
-          if (data.config.kpis) s.kpis = data.config.kpis;
+          setComponents(data.config.components || []);
+          setConnections(data.config.connections || []);
+          setKpis(data.config.kpis || []);
+          // Also push to Zustand so Scene3D and useKpiWebSocket can read them
           useTwinStore.setState({
             components: data.config.components || [],
             connections: data.config.connections || [],
             kpis: data.config.kpis || [],
-            selectedDomain: data.domain,
+            selectedDomain: data.domain || 'factory',
             twinName: data.name,
+            gridCols: data.config.gridCols || 10,
+            gridRows: data.config.gridRows || 7,
+            cellSize: data.config.cellSize || 6,
+            width: data.config.width || 60,
+            length: data.config.length || 40,
           });
         }
+        setLoading(false);
       })
-      .catch(e => setError(e.message));
-  }, [publishedId]);
+      .catch(e => { setError(e.message); setLoading(false); });
+  }, [pubId]);
+
+  // Real-time data via WebSocket
+  const { status: wsStatus, lastUpdate, messageCount, STATUS } = useKpiWebSocket(domain);
+
+  // Read KPIs from store (WebSocket updates them there)
+  const storeKpis = useTwinStore(s => s.kpis);
+  const storeComponents = useTwinStore(s => s.components);
 
   // Fallback simulation when WS offline
   useEffect(() => {
@@ -226,16 +302,26 @@ export default function PublishedView() {
     return () => clearInterval(t);
   }, [wsStatus, STATUS.LIVE]);
 
-  const critKpis = kpis.filter(k => k.status === 'red');
-  const warnKpis = kpis.filter(k => k.status === 'orange');
-  const name = dashboard?.name || twinName || 'Dashboard';
+  const critKpis = storeKpis.filter(k => k.status === 'red');
+  const warnKpis = storeKpis.filter(k => k.status === 'orange');
 
+  // Loading state
+  if (loading) return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ fontSize: '40px', animation: 'spin 1s linear infinite' }}>⬡</div>
+      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-0)' }}>Loading dashboard…</div>
+    </div>
+  );
+
+  // Error state
   if (error) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
       <div style={{ fontSize: '48px' }}>❌</div>
       <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-0)' }}>Dashboard not found</div>
       <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>{error}</div>
-      <button className="btn btn-primary" onClick={() => setStep(0)}>← Back to Home</button>
+      <Link to="/" style={{ padding: '8px 20px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', textDecoration: 'none', fontSize: '12px', fontWeight: 600 }}>
+        ← Back to Home
+      </Link>
     </div>
   );
 
@@ -248,51 +334,65 @@ export default function PublishedView() {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-0)' }}>
 
-      {/* ── Published banner ── */}
+      {/* ── Toolbar ── */}
       <div style={{
-        padding: '6px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-1)',
+        padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-1)',
         display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, flexWrap: 'wrap',
       }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '16px' }}>{DOMAIN_ICONS[domain] || '⬡'}</span>
-          <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-0)' }}>{name}</span>
-          <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '9px', fontWeight: 700, background: 'rgba(16,217,141,0.12)', color: '#10d98d', border: '1px solid rgba(16,217,141,0.3)' }}>
-            PUBLISHED{dashboard?.version ? ` v${dashboard.version}` : ''}
-          </span>
+        {/* Dashboard identity */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '20px' }}>{DOMAIN_ICONS[domain] || '⬡'}</span>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-0)', lineHeight: 1.2 }}>
+              {dashboard?.name || 'Dashboard'}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {domain} · v{dashboard?.version || 1}
+              <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '8px', fontWeight: 700, background: 'rgba(16,217,141,0.12)', color: '#10d98d', border: '1px solid rgba(16,217,141,0.3)' }}>
+                LIVE
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Live badge */}
+        {/* Real-time status badge */}
         <div style={{
-          fontSize: '10px', padding: '3px 10px', borderRadius: '8px', fontWeight: 600,
+          fontSize: '10px', padding: '4px 12px', borderRadius: '8px', fontWeight: 600,
           background: wsStatus === 'live' ? 'rgba(16,217,141,0.1)' : 'rgba(245,158,11,0.1)',
           color: wsStatus === 'live' ? '#10d98d' : '#f59e0b',
           border: `1px solid ${wsStatus === 'live' ? '#10d98d' : '#f59e0b'}40`,
+          display: 'flex', alignItems: 'center', gap: '6px',
         }}>
-          {wsStatus === 'live' ? `● Live · ${messageCount} readings` : wsStatus === 'connecting' ? '⏳ Connecting…' : '⚠️ Stale data'}
-          {lastUpdate && wsStatus === 'live' && <span style={{ marginLeft: '6px', opacity: 0.5 }}>Updated {lastUpdate.toLocaleTimeString()}</span>}
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: wsStatus === 'live' ? '#10d98d' : '#f59e0b', animation: wsStatus === 'live' ? 'pulse-dot 1.5s infinite' : 'none' }} />
+          {wsStatus === 'live' ? `Real-time · ${messageCount} readings` : wsStatus === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
+          {lastUpdate && wsStatus === 'live' && <span style={{ opacity: 0.5 }}>{lastUpdate.toLocaleTimeString()}</span>}
         </div>
 
-        {/* Alerts summary */}
+        {/* Alerts */}
         {(critKpis.length > 0 || warnKpis.length > 0) && (
-          <div style={{ fontSize: '10px', padding: '3px 10px', borderRadius: '8px', fontWeight: 600, background: critKpis.length > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', color: critKpis.length > 0 ? '#ef4444' : '#f59e0b', border: `1px solid ${critKpis.length > 0 ? '#ef4444' : '#f59e0b'}40` }}>
+          <div style={{ fontSize: '10px', padding: '4px 12px', borderRadius: '8px', fontWeight: 600, background: critKpis.length > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', color: critKpis.length > 0 ? '#ef4444' : '#f59e0b', border: `1px solid ${critKpis.length > 0 ? '#ef4444' : '#f59e0b'}40` }}>
             🔔 {critKpis.length > 0 ? `${critKpis.length} Critical` : `${warnKpis.length} Warn`}
           </div>
         )}
 
-        {/* Camera */}
+        {/* Camera controls */}
         <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-0)', borderRadius: '8px', padding: '2px' }}>
           {['Isometric', 'Top', 'Front', 'Free'].map(v => (
             <button key={v} onClick={() => setCameraView(v)}
-              style={{ padding: '3px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 600, background: cameraView === v ? 'var(--accent)' : 'transparent', color: cameraView === v ? '#fff' : 'var(--text-2)' }}
+              style={{ padding: '3px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 600, transition: 'all 0.15s', background: cameraView === v ? 'var(--accent)' : 'transparent', color: cameraView === v ? '#fff' : 'var(--text-2)' }}
             >{v}</button>
           ))}
         </div>
 
-        <button className="btn btn-ghost" style={{ fontSize: '11px' }} onClick={() => setStep(0)}>← Home</button>
+        {/* Powered by badge */}
+        <div style={{ fontSize: '9px', color: 'var(--text-2)', padding: '3px 8px', borderRadius: '6px', background: 'var(--bg-2)', fontWeight: 600 }}>
+          ⬡ Digital Twin Platform
+        </div>
       </div>
 
       {/* ── Main content ── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+
         {/* 3D Scene */}
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <Scene3D cameraView={cameraView.toLowerCase()} />
@@ -300,8 +400,8 @@ export default function PublishedView() {
           {/* Stats overlay */}
           <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', flexDirection: 'column', gap: '6px', pointerEvents: 'none' }}>
             {[
-              { icon: '⬡', label: 'Components', value: components.length, color: '#4865f2' },
-              { icon: '✅', label: 'OK', value: kpis.filter(k => k.status === 'green').length, color: '#10d98d' },
+              { icon: '⬡', label: 'Components', value: storeComponents.length, color: '#4865f2' },
+              { icon: '✅', label: 'OK', value: storeKpis.filter(k => k.status === 'green').length, color: '#10d98d' },
               { icon: '⚠️', label: 'Warnings', value: warnKpis.length, color: '#f59e0b' },
               { icon: '🚨', label: 'Critical', value: critKpis.length, color: '#ef4444' },
             ].map(s => (
@@ -316,72 +416,25 @@ export default function PublishedView() {
           </div>
         </div>
 
-        {/* ── Right sidebar ── */}
-        <div style={{ width: '310px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)', background: 'var(--bg-1)', overflow: 'hidden' }}>
+        {/* ── Right sidebar (KPIs / Charts / NLQ AI) ── */}
+        <div style={{ width: '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--border)', background: 'var(--bg-1)', overflow: 'hidden' }}>
           {/* Tab bar */}
           <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg-0)', flexShrink: 0 }}>
             {TABS.map(t => (
               <button key={t.id} onClick={() => setPanel(t.id)}
-                style={{ flex: 1, padding: '9px 4px', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 600, borderBottom: `2px solid ${panel === t.id ? 'var(--accent)' : 'transparent'}`, background: 'transparent', color: panel === t.id ? 'var(--accent)' : 'var(--text-2)' }}
+                style={{ flex: 1, padding: '10px 4px', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 600, transition: 'all 0.15s', borderBottom: `2px solid ${panel === t.id ? 'var(--accent)' : 'transparent'}`, background: 'transparent', color: panel === t.id ? 'var(--accent)' : 'var(--text-2)' }}
               >{t.label}</button>
             ))}
           </div>
+
+          {/* Panel content */}
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            {panel === 'kpi' && <ViewerKpis kpis={kpis} components={components} />}
-            {panel === 'charts' && <ViewerCharts kpis={kpis} kpiHistory={kpiHistory} domain={domain} />}
-            {panel === 'chat' && <ViewerChat domain={domain} />}
+            {panel === 'kpi'    && <ViewerKpis kpis={storeKpis} components={storeComponents} />}
+            {panel === 'charts' && <ViewerCharts domain={domain} />}
+            {panel === 'chat'   && <ViewerChat domain={domain} />}
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-
-/* ── Viewer Charts ──────────────────────────────────────────── */
-function ViewerCharts({ kpis, kpiHistory, domain }) {
-  const [chartData, setChartData] = useState([]);
-  useEffect(() => {
-    fetch(`${BASE}/analytics/chart-data?domain=${domain}&limit=30`)
-      .then(r => r.ok ? r.json() : { rows: [] })
-      .then(d => setChartData(d.rows || []))
-      .catch(() => {});
-    const t = setInterval(() => {
-      fetch(`${BASE}/analytics/chart-data?domain=${domain}&limit=30`)
-        .then(r => r.ok ? r.json() : { rows: [] })
-        .then(d => setChartData(d.rows || []))
-        .catch(() => {});
-    }, 30000);
-    return () => clearInterval(t);
-  }, [domain]);
-
-  if (chartData.length === 0 && kpiHistory.length === 0) {
-    return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-2)', fontSize: '13px' }}>📈 No chart data yet</div>;
-  }
-
-  const numericKeys = chartData.length > 0
-    ? Object.keys(chartData[0]).filter(k => k !== 'id' && k !== 'recorded_at' && k !== 'flow_status' && typeof chartData[0][k] === 'number')
-    : [];
-  const CHART_COLORS = ['#4865f2', '#10d98d', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
-
-  return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
-      {numericKeys.map((key, i) => (
-        <div key={key} style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{key.replace(/_/g, ' ')}</div>
-          <div style={{ background: 'var(--bg-0)', borderRadius: '10px', padding: '8px', border: '1px solid var(--border)' }}>
-            <ResponsiveContainer width="100%" height={100}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(72,101,242,0.06)" />
-                <XAxis dataKey="recorded_at" tick={false} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 8, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '10px' }} />
-                <Line dataKey={key} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={false} isAnimationActive={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

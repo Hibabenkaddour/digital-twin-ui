@@ -61,7 +61,6 @@ const useTwinStore = create((set, get) => ({
   selectedComponentId: null,
   hoveredComponentId: null,
   activePanel: 'kpi',
-  publishedId: null,    // ID of currently viewed published dashboard
 
   // Persisted sessions (localStorage)
   savedSessions: (() => { try { return JSON.parse(localStorage.getItem('dt2_sessions') || '[]'); } catch { return []; } })(),
@@ -75,7 +74,6 @@ const useTwinStore = create((set, get) => ({
     currentStep: step,
     selectedComponentId: s.currentStep !== step ? null : s.selectedComponentId
   })),
-  viewPublished: (id) => set({ publishedId: id, currentStep: 7 }),
   setDomain:     (domain) => set({ selectedDomain: domain }),
   setTwinName:   (name)   => set({ twinName: name }),
   setDimensions: (width, length) => {

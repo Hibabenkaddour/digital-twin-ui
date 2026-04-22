@@ -436,7 +436,7 @@ function ChatPanel({ selectedDomain }) {
 
 // ─── Publish Button + Modal ──────────────────────────────────
 function PublishButton() {
-  const { components, connections, kpis, selectedDomain, twinName, viewPublished } = useTwinStore();
+  const { components, connections, kpis, selectedDomain, twinName, width, length, gridCols, gridRows, cellSize } = useTwinStore();
   const [open, setOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState(null);
@@ -449,7 +449,7 @@ function PublishButton() {
   const handlePublish = async () => {
     setPublishing(true);
     try {
-      const config = { components, connections, kpis };
+      const config = { components, connections, kpis, width, length, gridCols, gridRows, cellSize };
       const res = await fetch(`${BASE}/publish/create`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -560,9 +560,9 @@ function PublishButton() {
 
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                   <button onClick={() => setOpen(false)} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-2)', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Close</button>
-                  <button onClick={() => { setOpen(false); viewPublished(result.id); }}
-                    style={{ padding: '9px 24px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
-                  >👁 View Published</button>
+                  <a href={result.url} target="_blank" rel="noopener noreferrer"
+                    style={{ padding: '9px 24px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >👁 Open Published Link</a>
                 </div>
               </div>
             )}

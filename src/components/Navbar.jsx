@@ -42,10 +42,10 @@ export default function Navbar() {
         }}>⬡</div>
         <div style={{ lineHeight: 1.1 }}>
           <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-0)', letterSpacing: '-0.01em' }}>
-            Nexus 3D
+            DXC Analytics
           </div>
           <div style={{ fontSize: '10px', color: 'var(--text-2)', fontWeight: 500 }}>
-            Digital Twin Platform
+            Intelligent Analytics
           </div>
         </div>
       </button>
@@ -85,7 +85,7 @@ export default function Navbar() {
         fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
         letterSpacing: '0.06em',
       }}>
-        Nexus 3D
+        DXC IA
       </div>
     </nav>
   );

@@ -2,6 +2,7 @@
 main.py — FastAPI application entry point
 Registers all routers, WebSocket, CORS, and background simulator.
 """
+import os
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, Query
@@ -35,11 +36,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS (allow Vite dev server) ─────────────────────────────
+# ── CORS (env-based, production-safe) ─────────────────────────
+_cors_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174",
-                   "http://localhost:5175", "http://localhost:3000", "*"],
+    allow_origins=[o.strip() for o in _cors_origins.split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
