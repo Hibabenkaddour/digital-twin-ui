@@ -444,6 +444,7 @@ Build in this sequence. Each phase should be a working increment:
 
 ## Instructions for Implementation
 
+
 - Write clean, production-grade TypeScript with full type safety
 - Every API endpoint must validate input (use Zod schemas)
 - Every database query must be parameterized (no string concatenation)

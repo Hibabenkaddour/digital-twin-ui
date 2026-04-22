@@ -13,6 +13,7 @@ export default defineConfig({
       '/health': 'http://localhost:8000',
       '/nlq':    'http://localhost:8000',
       '/datasources': 'http://localhost:8000',
+      '/publish': 'http://localhost:8000',
       '/ws':     { target: 'ws://localhost:8000', ws: true },
     },
   },

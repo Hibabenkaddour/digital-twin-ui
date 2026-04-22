@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import useTwinStore, { DOMAINS } from '../store/useTwinStore';
 import { Play, Layers, Sparkles, Clock, Trash2, ArrowRight, Database } from 'lucide-react';
 
@@ -20,7 +21,16 @@ function timeAgo(iso) {
 }
 
 export default function HomePage() {
-  const { setStep, loadDemo, twins, savedSessions, loadSession, deleteSession } = useTwinStore();
+  const { setStep, loadDemo, twins, savedSessions, loadSession, deleteSession, viewPublished } = useTwinStore();
+  const [published, setPublished] = useState([]);
+  const BASE = import.meta.env.VITE_API_URL || '';
+
+  useEffect(() => {
+    fetch(`${BASE}/publish/list`)
+      .then(r => r.ok ? r.json() : { dashboards: [] })
+      .then(d => setPublished(d.dashboards || []))
+      .catch(() => {});
+  }, []);
 
   return (
     <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -140,6 +150,55 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* ── Published Dashboards ── */}
+      {published.length > 0 && (
+        <div style={{ padding: '40px 60px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
+            <span style={{ fontSize: '14px' }}>🚀</span>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              Published Dashboards — Live Interactive Views
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px', marginBottom: '40px' }}>
+            {published.map(pub => {
+              const dc = DOMAIN_COLORS[pub.domain] || '#10d98d';
+              return (
+                <div key={pub.id}
+                  className="glass"
+                  style={{
+                    padding: '18px 20px', borderRadius: '14px', position: 'relative',
+                    border: `1px solid ${dc}30`,
+                    background: `linear-gradient(135deg, rgba(255,255,255,0.85), ${dc}08)`,
+                    transition: 'all 0.22s ease', cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 28px ${dc}22`; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+                  onClick={() => viewPublished(pub.id)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '26px' }}>{DOMAIN_ICONS[pub.domain] || '📊'}</span>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-0)', lineHeight: 1.2 }}>{pub.name}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-2)', marginTop: '2px' }}>{pub.domain} · v{pub.version}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '9px', padding: '2px 8px', borderRadius: '8px', background: 'rgba(16,217,141,0.12)', color: '#10d98d', fontWeight: 700, border: '1px solid rgba(16,217,141,0.25)' }}>PUBLISHED</span>
+                    <span style={{ fontSize: '9px', padding: '2px 8px', borderRadius: '8px', background: `${dc}15`, color: dc, fontWeight: 600, border: `1px solid ${dc}25` }}>{pub.access_type}</span>
+                    <span style={{ fontSize: '9px', padding: '2px 8px', borderRadius: '8px', background: 'rgba(72,101,242,0.1)', color: 'var(--accent)', fontWeight: 600 }}>{timeAgo(pub.updated_at)}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 700, color: dc }}>
+                    <ArrowRight size={13} /> View Dashboard
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ height: '1px', background: 'var(--border)' }} />
+        </div>
+      )}
+
       {/* ── Domain cards ── */}
       <div style={{ padding: '48px 60px' }}>
         <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '24px' }}>
@@ -192,6 +251,7 @@ export default function HomePage() {
             '📊 Real-Time KPI Monitoring', '🔗 Component Connections',
             '⚡ Live PostgreSQL Data', '📐 Blueprint Catalog',
             '💾 Session Save & Restore', '🎨 3D Visualization',
+            '🚀 Publish & Share', '🦙 NLQ Analytics (Groq)',
           ].map(f => (
             <span key={f} className="glass-subtle" style={{ padding: '8px 16px', fontSize: '13px', color: 'var(--text-1)', borderRadius: '100px' }}>
               {f}

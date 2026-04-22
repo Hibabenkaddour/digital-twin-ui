@@ -13,6 +13,7 @@ import ConnectionsStep from './pages/ConnectionsStep';
 import KpiStep from './pages/KpiStep';
 import TwinView from './pages/TwinView';
 import DataSourceWizard from './pages/DataSourceWizard';
+import PublishedView from './pages/PublishedView';
 
 export default function App() {
   const { currentStep } = useTwinStore();
@@ -26,6 +27,7 @@ export default function App() {
       case 4: return <KpiStep />;
       case 5: return <TwinView />;
       case 6: return <DataSourceWizard />;
+      case 7: return <PublishedView />;
       default: return <HomePage />;
     }
   };

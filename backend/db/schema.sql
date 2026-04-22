@@ -101,3 +101,18 @@ CREATE TABLE IF NOT EXISTS data_sources (
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ── Published dashboards (publish system) ───────────────
+CREATE TABLE IF NOT EXISTS published_dashboards (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    domain          TEXT NOT NULL,
+    config          TEXT NOT NULL,       -- JSON (frozen dashboard state)
+    theme           TEXT,                -- JSON (logo, colors, fonts)
+    access_type     TEXT DEFAULT 'public',  -- 'public', 'password', 'invite'
+    access_password TEXT,
+    version         INTEGER DEFAULT 1,
+    is_draft        BOOLEAN DEFAULT false,
+    published_at    TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);

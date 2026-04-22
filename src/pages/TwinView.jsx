@@ -434,6 +434,145 @@ function ChatPanel({ selectedDomain }) {
   );
 }
 
+// ─── Publish Button + Modal ──────────────────────────────────
+function PublishButton() {
+  const { components, connections, kpis, selectedDomain, twinName, viewPublished } = useTwinStore();
+  const [open, setOpen] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [result, setResult] = useState(null);
+  const [pubName, setPubName] = useState('');
+  const [accessType, setAccessType] = useState('public');
+  const [copied, setCopied] = useState(false);
+
+  const BASE = import.meta.env.VITE_API_URL || '';
+
+  const handlePublish = async () => {
+    setPublishing(true);
+    try {
+      const config = { components, connections, kpis };
+      const res = await fetch(`${BASE}/publish/create`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: pubName || twinName || 'My Dashboard',
+          domain: selectedDomain || 'factory',
+          config,
+          access_type: accessType,
+        }),
+      });
+      const data = await res.json();
+      setResult(data);
+    } catch (err) {
+      setResult({ error: err.message });
+    }
+    setPublishing(false);
+  };
+
+  const copyUrl = () => {
+    if (result?.url) {
+      navigator.clipboard.writeText(window.location.origin + result.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <>
+      <button onClick={() => { setOpen(true); setPubName(twinName || ''); setResult(null); }}
+        style={{
+          padding: '4px 12px', borderRadius: '8px', border: '1px solid rgba(16,217,141,0.3)',
+          background: 'rgba(16,217,141,0.08)', color: '#10d98d',
+          cursor: 'pointer', fontSize: '11px', fontWeight: 700,
+          display: 'flex', alignItems: 'center', gap: '5px',
+        }}
+      >
+        🚀 Publish
+      </button>
+
+      {/* Publish modal */}
+      {open && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-1)', borderRadius: '16px', padding: '28px', width: '420px', maxWidth: '90vw', border: '1px solid var(--border)', boxShadow: '0 16px 64px rgba(0,0,0,0.3)' }}>
+
+            {!result ? (
+              <>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-0)', marginBottom: '4px' }}>🚀 Publish Dashboard</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-2)', marginBottom: '20px' }}>
+                  Freeze the current layout and make it accessible as a live, interactive viewer.
+                </p>
+
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>Dashboard Name</label>
+                <input value={pubName} onChange={e => setPubName(e.target.value)} placeholder="My Dashboard"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '13px', outline: 'none', marginBottom: '16px', boxSizing: 'border-box' }} />
+
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Access Type</label>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '20px' }}>
+                  {[
+                    { id: 'public', icon: '🌐', label: 'Public' },
+                    { id: 'password', icon: '🔒', label: 'Password' },
+                    { id: 'invite', icon: '✉️', label: 'Invite Only' },
+                  ].map(a => (
+                    <button key={a.id} onClick={() => setAccessType(a.id)}
+                      style={{ flex: 1, padding: '10px 8px', borderRadius: '8px', border: `1px solid ${accessType === a.id ? 'var(--accent)' : 'var(--border)'}`, background: accessType === a.id ? 'rgba(72,101,242,0.06)' : 'var(--bg-0)', color: accessType === a.id ? 'var(--accent)' : 'var(--text-2)', cursor: 'pointer', textAlign: 'center', fontSize: '11px', fontWeight: 600 }}
+                    >{a.icon} {a.label}</button>
+                  ))}
+                </div>
+
+                {/* Info bar */}
+                <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(72,101,242,0.06)', border: '1px solid rgba(72,101,242,0.15)', fontSize: '11px', color: 'var(--text-2)', marginBottom: '20px', lineHeight: 1.5 }}>
+                  📦 Freezing: <strong>{components.length}</strong> components · <strong>{connections.length}</strong> connections · <strong>{kpis.length}</strong> KPIs<br />
+                  🌐 Domain: <strong>{selectedDomain || 'factory'}</strong> · NLQ: <strong>Groq Llama 3.3</strong>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setOpen(false)} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-2)', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Cancel</button>
+                  <button onClick={handlePublish} disabled={publishing}
+                    style={{ padding: '9px 24px', borderRadius: '8px', background: '#10d98d', color: '#fff', border: 'none', cursor: publishing ? 'wait' : 'pointer', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >{publishing ? '⏳ Publishing…' : '🚀 Publish Now'}</button>
+                </div>
+              </>
+            ) : result.error ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <div style={{ fontSize: '40px', marginBottom: '10px' }}>❌</div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: '#ef4444', marginBottom: '8px' }}>Publish failed</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-2)' }}>{result.error}</div>
+                <button onClick={() => setResult(null)} className="btn btn-primary" style={{ marginTop: '16px' }}>Try Again</button>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '48px', marginBottom: '10px' }}>🎉</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-0)', marginBottom: '4px' }}>Published!</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-2)', marginBottom: '16px' }}>Version {result.version} · {new Date(result.published_at).toLocaleString()}</div>
+
+                {/* URL */}
+                <div style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-0)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <code style={{ flex: 1, fontSize: '11px', color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{window.location.origin}{result.url}</code>
+                  <button onClick={copyUrl} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: copied ? 'rgba(16,217,141,0.1)' : 'var(--bg-2)', color: copied ? '#10d98d' : 'var(--text-0)', cursor: 'pointer', fontSize: '10px', fontWeight: 600 }}>
+                    {copied ? '✅ Copied!' : '📋 Copy'}
+                  </button>
+                </div>
+
+                {/* Embed code */}
+                <div style={{ padding: '8px', borderRadius: '8px', background: 'var(--bg-0)', border: '1px solid var(--border)', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-2)', marginBottom: '4px' }}>EMBED CODE</div>
+                  <code style={{ fontSize: '9px', color: 'var(--text-2)', wordBreak: 'break-all' }}>{result.embed}</code>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                  <button onClick={() => setOpen(false)} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-2)', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Close</button>
+                  <button onClick={() => { setOpen(false); viewPublished(result.id); }}
+                    style={{ padding: '9px 24px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+                  >👁 View Published</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── TwinView ─────────────────────────────────────────────────
 export default function TwinView() {
   const {
@@ -519,6 +658,9 @@ export default function TwinView() {
         >
           {sessionSaved ? '✅ Saved!' : '💾 Save'}
         </button>
+
+        {/* Publish button */}
+        <PublishButton />
       </div>
 
       {/* ── Alert dropdown ── */}
