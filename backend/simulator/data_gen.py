@@ -238,4 +238,4 @@ async def run_simulator():
         except Exception as e:
             print(f"[Simulator] Error: {e}")
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(30)

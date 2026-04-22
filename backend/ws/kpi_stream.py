@@ -100,7 +100,7 @@ async def kpi_ws_handler(websocket: WebSocket, domain: str):
 
         # ── Live streaming loop ───────────────────────────────
         while True:
-            await asyncio.sleep(2)
+            await asyncio.sleep(30)
 
             latest = await pool.fetchrow(
                 f"SELECT * FROM {table} ORDER BY id DESC LIMIT 1"
