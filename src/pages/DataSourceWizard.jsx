@@ -181,9 +181,31 @@ function Step2({ sourceType, config, setConfig, testResult, testing, onTest, csv
       <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-0)', marginBottom: '4px' }}>
         Configure {SOURCE_TYPES.find(s => s.id === sourceType)?.name}
       </h2>
-      <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '20px' }}>
+      <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '16px' }}>
         Enter the connection details for your database.
       </p>
+
+      {/* Quick connect shortcut */}
+      <button
+        onClick={() => setConfig({ host: 'db', port: 5432, database: 'dt2_db', username: 'dt2_user', password: 'dt2_pass', ssl: false })}
+        style={{
+          padding: '10px 16px', borderRadius: '10px', marginBottom: '16px',
+          border: '1px solid rgba(16,217,141,0.3)', background: 'rgba(16,217,141,0.06)',
+          color: '#10d98d', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'center',
+        }}
+      >
+        ⚡ Quick Connect — Local Docker PostgreSQL (dt2_db)
+      </button>
+
+      {/* Docker networking hint */}
+      <div style={{
+        padding: '8px 12px', borderRadius: '8px', marginBottom: '16px',
+        background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)',
+        fontSize: '11px', color: '#f59e0b', lineHeight: 1.5,
+      }}>
+        💡 <b>Docker tip:</b> Since the backend runs inside Docker, use <code style={{ background: 'rgba(245,158,11,0.15)', padding: '1px 4px', borderRadius: '3px' }}>db</code> as host (not <code style={{ background: 'rgba(245,158,11,0.15)', padding: '1px 4px', borderRadius: '3px' }}>localhost</code>). For external databases, use the actual IP or hostname.
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         {fields.map(f => (
