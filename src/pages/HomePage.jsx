@@ -1,5 +1,5 @@
 import useTwinStore, { DOMAINS } from '../store/useTwinStore';
-import { Play, Layers, Sparkles, Clock, Trash2, ArrowRight } from 'lucide-react';
+import { Play, Layers, Sparkles, Clock, Trash2, ArrowRight, Database } from 'lucide-react';
 
 const DOMAIN_ICONS  = { factory: '🏭', airport: '✈️', warehouse: '📦' };
 const DOMAIN_COLORS = { factory: '#f97316', airport: '#06b6d4', warehouse: '#84cc16' };
@@ -56,6 +56,9 @@ export default function HomePage() {
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button className="btn btn-primary btn-lg" onClick={() => setStep(1)}>
             <Play size={18} /> Create New Twin
+          </button>
+          <button className="btn btn-ghost btn-lg" onClick={() => setStep(6)} style={{ borderColor: 'rgba(16,217,141,0.4)', color: '#10d98d' }}>
+            <Database size={18} /> Connect Data Source
           </button>
           <button className="btn btn-ghost btn-lg" onClick={() => { loadDemo(); setStep(5); }}>
             <Layers size={18} /> View Live Demo

@@ -88,3 +88,16 @@ VALUES
   ('warehouse','reception_dock_102', 'Dock Util.',   'dock_util',    '%',   80, 90,  'asc', 'glow'),
   ('warehouse','sorter_103',         'Error Rate',   'sorter_error_rate','%', 1, 5,  'asc', 'pulse')
 ON CONFLICT (domain, component_id, kpi_name) DO NOTHING;
+
+-- ── Data sources (connection wizard) ────────────────────────
+CREATE TABLE IF NOT EXISTS data_sources (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    source_type     TEXT NOT NULL,       -- 'postgresql', 'mysql', 'csv', 'rest_api', etc.
+    config          TEXT NOT NULL,       -- JSON (connection params, encrypted at rest)
+    schema_info     TEXT,                -- JSON (auto-discovered tables/columns)
+    schema_mappings TEXT,                -- JSON (admin aliases, tags, enabled fields)
+    status          TEXT DEFAULT 'disconnected',  -- 'connected', 'degraded', 'disconnected'
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
