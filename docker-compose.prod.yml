@@ -40,8 +40,6 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       GROQ_API_KEY: ${GROQ_API_KEY}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
-    env_file:
-      - ./backend/.env
 
   # ── Frontend (Nginx reverse proxy + React SPA) ─────────────
   frontend:
@@ -55,10 +53,12 @@ services:
       - backend
 
   # ── Cloudflare Tunnel (free public URL) ─────────────────────
+  # Quick tunnel mode: auto-generates a random *.trycloudflare.com URL
+  # Check the URL with: docker compose -f docker-compose.prod.yml logs cloudflared
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: always
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate --url http://frontend:80
     depends_on:
       - frontend
 
