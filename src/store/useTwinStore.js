@@ -171,8 +171,8 @@ const useTwinStore = create((set, get) => ({
     length: 40,
     gridCols: 0,
     gridRows: 0,
-    minCols: 5,
-    minRows: 4,
+    minCols: 1,
+    minRows: 1,
     cellSize: 6,
 
     twins: [],
@@ -204,8 +204,24 @@ const useTwinStore = create((set, get) => ({
         set({ width, length, gridCols: Math.ceil(width / cellSize), gridRows: Math.ceil(length / cellSize), cellSize });
     },
     resizeGrid: (cols, rows) => {
-        const { cellSize } = get();
-        set({ gridCols: cols, gridRows: rows, width: cols * cellSize, length: rows * cellSize });
+        const { cellSize, components, minCols, minRows } = get();
+        
+        // Find the maximum extent of all placed components
+        let maxColExtent = minCols;
+        let maxRowExtent = minRows;
+        
+        components.forEach(c => {
+            const extCol = c.col + c.gridSize[0];
+            const extRow = c.row + c.gridSize[1];
+            if (extCol > maxColExtent) maxColExtent = extCol;
+            if (extRow > maxRowExtent) maxRowExtent = extRow;
+        });
+
+        // Enforce the boundary
+        const safeCols = Math.max(cols, maxColExtent);
+        const safeRows = Math.max(rows, maxRowExtent);
+
+        set({ gridCols: safeCols, gridRows: safeRows, width: safeCols * cellSize, length: safeRows * cellSize });
     },
     selectComponent: (id) => set({ selectedComponentId: id }),
     hoverComponent: (id) => set({ hoveredComponentId: id }),
@@ -347,6 +363,43 @@ const useTwinStore = create((set, get) => ({
                     c.id === id 
                         ? { ...c, gridSize: [newW, newH], rotation: ((c.rotation || 0) + 90) % 360 } 
                         : c
+                )
+            };
+        });
+    },
+
+    resizeComponent: (id, newW, newH) => {
+        set(s => {
+            if (newW < 1 || newH < 1) return s;
+            const comp = s.components.find(c => c.id === id);
+            if (!comp) return s;
+
+            // Check boundaries
+            if (comp.col + newW > s.gridCols || comp.row + newH > s.gridRows) {
+                return s;
+            }
+
+            // Check collisions
+            const occupied = new Set();
+            s.components.forEach(c => {
+                if (c.id === id) return;
+                const [cw, ch] = c.gridSize;
+                for (let r = c.row; r < c.row + ch; r++)
+                    for (let cl = c.col; cl < c.col + cw; cl++)
+                        occupied.add(`${r}-${cl}`);
+            });
+
+            for (let r = comp.row; r < comp.row + newH; r++) {
+                for (let c = comp.col; c < comp.col + newW; c++) {
+                    if (occupied.has(`${r}-${c}`)) {
+                        return s; // collision detected
+                    }
+                }
+            }
+
+            return {
+                components: s.components.map(c =>
+                    c.id === id ? { ...c, gridSize: [newW, newH] } : c
                 )
             };
         });

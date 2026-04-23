@@ -723,7 +723,14 @@ function ComponentMesh({ component, kpis, cellSize, selected, hovered, onSelect,
 
             {/* Domain-specific shape */}
             <group rotation={[0, THREE.MathUtils.degToRad(-(component.rotation || 0)), 0]}>
-                <DomainShape type={component.type} w={nativeW} d={nativeD} h={h} color={statusColor} mesh3D={component.mesh3D} />
+                <DomainShape 
+                    type={component.type} 
+                    w={(component.rotation || 0) % 180 !== 0 ? d : w} 
+                    d={(component.rotation || 0) % 180 !== 0 ? w : d} 
+                    h={h} 
+                    color={statusColor} 
+                    mesh3D={component.mesh3D} 
+                />
             </group>
 
             {/* KPI Outline Glow or Selection glow */}

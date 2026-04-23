@@ -6,7 +6,7 @@ const CELL_PX = 40;
 const STATUS_COLORS = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
 
 export default function Grid2D() {
-    const { currentStep, components, connections, kpis, gridCols, gridRows, selectedComponentId, hoveredComponentId, selectComponent, hoverComponent, moveComponent, removeComponent, addConnection, rotateComponent } = useTwinStore();
+    const { currentStep, components, connections, kpis, gridCols, gridRows, selectedComponentId, hoveredComponentId, selectComponent, hoverComponent, moveComponent, removeComponent, addConnection, rotateComponent, resizeComponent } = useTwinStore();
     const cols = gridCols || 10;
     const rows = gridRows || 8;
     const isConnectionStep = currentStep === 3;
@@ -188,11 +188,12 @@ export default function Grid2D() {
                                         flexDirection: 'column',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        overflow: 'hidden',
+                                        overflow: isSelected && !isDraggingThis ? 'visible' : 'hidden',
                                         position: 'relative',
                                         transition: isDraggingThis ? 'none' : 'all 0.15s ease',
                                         opacity: isDraggingThis ? 0.4 : 1,
                                         boxShadow: isSelected && !isDraggingThis ? '0 0 10px rgba(72,101,242,0.2)' : 'none',
+                                        zIndex: isSelected && !isDraggingThis ? 10 : 1,
                                     }}
                                     onMouseDown={comp ? (e) => handleMouseDown(e, comp) : undefined}
                                     onMouseUp={(e) => {
@@ -302,6 +303,21 @@ export default function Grid2D() {
                                                 >
                                                     <Trash2 size={10} />
                                                 </button>
+                                            )}
+                                            {/* Resize controls */}
+                                            {isSelected && !isDraggingThis && (
+                                                <>
+                                                    {/* Width controls (Right) */}
+                                                    <div style={{ position: 'absolute', right: '-24px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 100 }} onMouseDown={e => e.stopPropagation()}>
+                                                        <button onClick={(e) => { e.stopPropagation(); resizeComponent(comp.id, cw + 1, ch); }} style={{ width: '20px', height: '20px', fontSize: '12px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }} title="Increase Width">+</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); resizeComponent(comp.id, cw - 1, ch); }} style={{ width: '20px', height: '20px', fontSize: '12px', background: 'var(--bg-2)', color: 'var(--text-1)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }} title="Decrease Width">-</button>
+                                                    </div>
+                                                    {/* Height controls (Bottom) */}
+                                                    <div style={{ position: 'absolute', bottom: '-24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '4px', zIndex: 100 }} onMouseDown={e => e.stopPropagation()}>
+                                                        <button onClick={(e) => { e.stopPropagation(); resizeComponent(comp.id, cw, ch + 1); }} style={{ width: '20px', height: '20px', fontSize: '12px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }} title="Increase Height">+</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); resizeComponent(comp.id, cw, ch - 1); }} style={{ width: '20px', height: '20px', fontSize: '12px', background: 'var(--bg-2)', color: 'var(--text-1)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }} title="Decrease Height">-</button>
+                                                    </div>
+                                                </>
                                             )}
                                         </>
                                     )}
