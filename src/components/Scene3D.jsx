@@ -871,6 +871,14 @@ function CameraController({ view, cx, cz }) {
 }
 
 // ─── Main Export ───────────────────────────────────────────────────────────────
+function SceneExporterBridge() {
+    const { scene } = useThree();
+    useEffect(() => {
+        useTwinStore.setState({ threeSceneRef: scene });
+    }, [scene]);
+    return null;
+}
+
 export default function Scene3D({ cameraView }) {
     const { components, connections, kpis, gridCols, gridRows, cellSize, selectedComponentId, hoveredComponentId, selectComponent, hoverComponent, activeView, moveComponent } = useTwinStore();
     const cols = gridCols || 10, rows = gridRows || 8, cs = cellSize || 6;
@@ -893,6 +901,7 @@ export default function Scene3D({ cameraView }) {
             gl={{ antialias: true, powerPreference: 'high-performance' }}
             onPointerMissed={() => selectComponent(null)}
         >
+            <SceneExporterBridge />
             <CameraController view={currentView} cx={cx} cz={cz} />
             <SceneBackground />
             <fog attach="fog" args={['#f4f5f7', 130, 400]} />

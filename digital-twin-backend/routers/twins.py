@@ -39,7 +39,17 @@ def get_twin(twin_id: str, db: Session = Depends(get_db)):
     db_layout = crud.get_layout(db, twin_id)
     if not db_layout:
         raise HTTPException(status_code=404, detail="Twin not found")
-    return crud.layout_db_to_schema(db_layout)
+    schema = crud.layout_db_to_schema(db_layout)
+
+    # Sync backend data stream to use this Twin's KPIs
+    try:
+        from routers.data_source import apply_assignments_sync
+        if schema.kpiAssignments:
+            apply_assignments_sync(schema.domain, schema.kpiAssignments)
+    except Exception as e:
+        print(f"Failed to sync KPIs on twin load: {e}")
+
+    return schema
 
 
 @router.put("/{twin_id}", response_model=TwinSummary)

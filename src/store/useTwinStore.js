@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { listTwins, getTwin, saveTwin as apiSaveTwin, deleteTwin as apiDeleteTwin } from '../services/api';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 export const DOMAINS = {
     factory: {
@@ -88,7 +91,8 @@ const generateComponents = (domain, gridCols, gridRows) => {
             let found = false;
             for (let col = 1; col < gridCols - w; col++) {
                 if (canPlace(col, row, w, h)) {
-                    placed.push({ id: `${bp.type}_${idCounter++}`, type: bp.type, name: `${bp.name} ${idCounter - 1}`, gridSize: bp.gridSize, color: bp.color, col, row, kpiIds: [] });
+                    const uniqueSuffix = Math.random().toString(36).substring(2,7);
+                    placed.push({ id: `${bp.type}_${idCounter++}_${uniqueSuffix}`, type: bp.type, name: `${bp.name} ${idCounter - 1}`, gridSize: bp.gridSize, color: bp.color, col, row, kpiIds: [] });
                     markOccupied(col, row, w, h);
                     found = true; break;
                 }
@@ -158,6 +162,8 @@ const AI_RESPONSES = (kpis, msg) => {
 let compIdCounter = 100;
 
 const useTwinStore = create((set, get) => ({
+    threeSceneRef: null,
+
     currentStep: 0,
     selectedDomain: null,
     twinName: '',
@@ -175,6 +181,7 @@ const useTwinStore = create((set, get) => ({
     components: [],
     connections: [],
     kpis: [],
+    kpiAssignments: [],
     kpiHistory: [],
     selectedComponentId: null,
     hoveredComponentId: null,
@@ -212,7 +219,7 @@ const useTwinStore = create((set, get) => ({
         const components = [];
         const connections = [];
         const kpiHistory = [];
-        set({ components, connections, kpis: [], kpiHistory });
+        set({ components, connections, kpis: [], kpiAssignments: [], kpiHistory });
     },
 
     addComponent: (type, overrides = {}) => {
@@ -229,8 +236,9 @@ const useTwinStore = create((set, get) => ({
 
         // If explicit position provided (from AI agent), use it
         if (overrides.row !== undefined && overrides.col !== undefined) {
+            const uniqueSuffix = Math.random().toString(36).substring(2,7);
             const newComp = {
-                id: `${type}_${++compIdCounter}`,
+                id: `${type}_${++compIdCounter}_${uniqueSuffix}`,
                 type,
                 name: overrides.name || `${bp.name} ${compIdCounter}`,
                 gridSize: overrides.gridSize || bp.gridSize,
@@ -256,7 +264,8 @@ const useTwinStore = create((set, get) => ({
                     for (let c = col; c < col + w && ok; c++)
                         if (occupied.has(`${r}-${c}`)) ok = false;
                 if (ok) {
-                    const newComp = { id: `${type}_${++compIdCounter}`, type, name: `${bp.name} ${compIdCounter}`, gridSize: bp.gridSize, color: bp.color, col, row, kpiIds: [] };
+                    const uniqueSuffix = Math.random().toString(36).substring(2,7);
+                    const newComp = { id: `${type}_${++compIdCounter}_${uniqueSuffix}`, type, name: `${bp.name} ${compIdCounter}`, gridSize: bp.gridSize, color: bp.color, col, row, kpiIds: [] };
                     set(s => ({ components: [...s.components, newComp] }));
                     return;
                 }
@@ -365,9 +374,11 @@ const useTwinStore = create((set, get) => ({
     clearKpis: () => {
         set(s => {
             const newComponents = s.components.map(c => ({ ...c, kpiIds: [] }));
-            return { kpis: [], kpiHistory: [], components: newComponents };
+            return { kpis: [], kpiAssignments: [], kpiHistory: [], components: newComponents };
         });
     },
+
+    setKpiAssignments: (assignments) => set({ kpiAssignments: assignments }),
 
     // Called by the WebSocket hook for each real-time reading from the backend
     updateKpiFromWS: (reading) => {
@@ -451,6 +462,44 @@ const useTwinStore = create((set, get) => ({
         set(s => ({ twins: [...s.twins, newTwin], activeTwinId: newTwin.id }));
     },
 
+    exportDigitalTwin: async () => {
+        const { threeSceneRef, twinName, selectedDomain, components, kpis, connections } = get();
+        if (!threeSceneRef) throw new Error("3D Scene not ready.");
+
+        // 1. Gather Data Snapshot
+        const dataSnapshot = {
+            timestamp: new Date().toISOString(),
+            twinName,
+            domain: selectedDomain,
+            components,
+            connections,
+            kpis,
+        };
+
+        // 2. Export GLTF
+        const exporter = new GLTFExporter();
+        const exportScene = () => new Promise((resolve, reject) => {
+            exporter.parse(
+                threeSceneRef,
+                (gltf) => { resolve(gltf); },
+                (err) => { reject(err); },
+                { binary: true } // GLB format
+            );
+        });
+
+        const glbBuffer = await exportScene();
+
+        // 3. Create ZIP
+        const zip = new JSZip();
+        zip.file("data.json", JSON.stringify(dataSnapshot, null, 2));
+        zip.file("scene.glb", glbBuffer);
+
+        // 4. Download
+        const content = await zip.generateAsync({ type: "blob" });
+        const name = (twinName || "digital_twin").replace(/\s+/g, '_').toLowerCase();
+        saveAs(content, `${name}_export.zip`);
+    },
+
     // ─── DB-persisted twin CRUD ────────────────────────────────────────────────
 
     fetchTwins: async () => {
@@ -463,7 +512,7 @@ const useTwinStore = create((set, get) => ({
     },
 
     saveTwinToDb: async () => {
-        const { activeTwinId, twinName, selectedDomain, width, length, gridCols, gridRows, components, connections } = get();
+        const { activeTwinId, twinName, selectedDomain, width, length, gridCols, gridRows, components, connections, kpiAssignments } = get();
         const id = activeTwinId || `twin_${Date.now()}`;
         const state = {
             id,
@@ -475,6 +524,7 @@ const useTwinStore = create((set, get) => ({
             gridRows,
             components,
             connections,
+            kpiAssignments,
         };
         try {
             const saved = await apiSaveTwin(id, state);
@@ -520,6 +570,7 @@ const useTwinStore = create((set, get) => ({
                 components: state.components || [],
                 connections: state.connections || [],
                 kpis: [],
+                kpiAssignments: state.kpiAssignments || [],
                 kpiHistory: [],
                 currentStep: targetStep,
             });

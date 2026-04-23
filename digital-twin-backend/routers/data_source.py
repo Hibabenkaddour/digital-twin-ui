@@ -141,6 +141,56 @@ async def assign_columns(payload: AssignmentsPayload):
 
     return {"saved": len(new_assignments), "assignments": new_assignments}
 
+def apply_assignments_sync(domain: str, assignments_list: list):
+    """
+    Synchronously update the global active KPI assignments when a Twin is loaded.
+    """
+    new_assignments = {}
+    for a in assignments_list:
+        kpi_id = a.get("kpi_id", a.get("id"))
+        if not kpi_id: continue
+        new_assignments[kpi_id] = {
+            "component_id": a.get("component_id"),
+            "kpi_name": a.get("kpi_name"),
+            "formula": a.get("formula"),
+            "unit": a.get("unit", ""),
+            "rules": a.get("rules", {}),
+            "interaction": a.get("interaction", "pulse"),
+        }
+    
+    _source_state["assignments"] = new_assignments
+    _source_state["domain"] = domain
+    _source_state["streaming"] = True
+    _source_state["connected_at"] = _source_state.get("connected_at") or datetime.utcnow().isoformat()
+
+    try:
+        from connectors.base import KPI_BUS
+        while not KPI_BUS.empty():
+            KPI_BUS.get_nowait()
+            
+        from routers.stream import manager
+        manager.clear_latest()
+    except Exception as e:
+        print(f"Failed to flush KPI bus: {e}")
+
+    with open(ASSIGNMENTS_FILE, "w") as f:
+        json.dump({"domain": domain, "assignments": new_assignments}, f, indent=2)
+
+    try:
+        from connectors.postgres_connector import get_postgres_connector
+        pc = get_postgres_connector()
+        if pc:
+            pc.update_assignments(new_assignments, domain)
+            if not pc._running:
+                import asyncio
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(pc.start())
+                except RuntimeError:
+                    pass
+    except Exception as e:
+        print(f"Failed to notify postgres connector: {e}")
+
 class ProposeKpisRequest(BaseModel):
     domain: str
     columns: List[str]

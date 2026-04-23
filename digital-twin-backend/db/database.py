@@ -31,6 +31,7 @@ class LayoutStateDB(Base):
     grid_rows = Column(Integer, default=8)
     components_json = Column(Text, default="[]")
     connections_json = Column(Text, default="[]")
+    assignments_json = Column(Text, default="[]")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

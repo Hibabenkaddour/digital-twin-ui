@@ -24,18 +24,31 @@ export default function KpiStep() {
             })
             .then(data => {
                 setColumns(data.columns || []);
-                // Convert dictionary assignments to array for the builder
+                // Prioritize assignments saved in Zustand for this specific Twin
+                const zustandAssignments = useTwinStore.getState().kpiAssignments || [];
+                if (zustandAssignments.length > 0) {
+                    setAssignments(zustandAssignments);
+                    return;
+                }
+
+                // Fallback: Check if global streaming config happens to match our components
                 const savedAssig = data.assignments || {};
-                const arr = Object.entries(savedAssig).map(([kpi_id, val]) => ({
-                    kpi_id,
-                    ...val
-                }));
+                const currentComponentIds = useTwinStore.getState().components.map(c => c.id);
+                const arr = Object.entries(savedAssig)
+                    .map(([kpi_id, val]) => ({
+                        kpi_id,
+                        ...val
+                    }))
+                    .filter(a => currentComponentIds.includes(a.component_id));
+                
                 if(arr.length > 0) {
                     setAssignments(arr);
+                } else {
+                    setAssignments([]);
                 }
             })
             .catch(e => setError("Failed to connect to PostgreSQL backend: " + e.message));
-    }, [selectedDomain]);
+    }, [selectedDomain, components]);
 
     const addKpi = () => {
         setAssignments([
@@ -124,6 +137,8 @@ export default function KpiStep() {
             
             // Clear local KPI cache in Zustand so Live View isn't stale
             useTwinStore.getState().clearKpis();
+            // Save the newly defined formulas in Zustand for DB persistence
+            useTwinStore.getState().setKpiAssignments(valid);
             
             setStep(5);
         } catch (e) {

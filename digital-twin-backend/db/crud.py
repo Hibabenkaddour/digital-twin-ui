@@ -40,6 +40,7 @@ def save_layout(db: Session, state: LayoutStateSchema) -> LayoutStateDB:
         existing.grid_rows = state.gridRows
         existing.components_json = json.dumps([c.model_dump() for c in state.components])
         existing.connections_json = json.dumps([c.model_dump() for c in state.connections])
+        existing.assignments_json = json.dumps(state.kpiAssignments)
         existing.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(existing)
@@ -55,6 +56,7 @@ def save_layout(db: Session, state: LayoutStateSchema) -> LayoutStateDB:
             grid_rows=state.gridRows,
             components_json=json.dumps([c.model_dump() for c in state.components]),
             connections_json=json.dumps([c.model_dump() for c in state.connections]),
+            assignments_json=json.dumps(state.kpiAssignments),
         )
         db.add(db_layout)
         db.commit()
@@ -74,6 +76,7 @@ def layout_db_to_schema(db_layout: LayoutStateDB) -> LayoutStateSchema:
         gridRows=db_layout.grid_rows,
         components=[ComponentSchema(**c) for c in json.loads(db_layout.components_json or "[]")],
         connections=[ConnectionSchema(**c) for c in json.loads(db_layout.connections_json or "[]")],
+        kpiAssignments=json.loads(db_layout.assignments_json or "[]"),
         createdAt=db_layout.created_at,
         updatedAt=db_layout.updated_at,
     )

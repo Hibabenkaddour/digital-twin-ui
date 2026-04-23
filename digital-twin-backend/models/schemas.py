@@ -36,6 +36,7 @@ class LayoutStateSchema(BaseModel):
     gridRows: int = 8
     components: list[ComponentSchema] = []
     connections: list[ConnectionSchema] = []
+    kpiAssignments: list[dict] = []
     createdAt: Optional[datetime] = None
     updatedAt: Optional[datetime] = None
 

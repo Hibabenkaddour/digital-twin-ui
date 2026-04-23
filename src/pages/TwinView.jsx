@@ -12,7 +12,7 @@
  */
 import { useEffect, useState } from 'react';
 import useTwinStore from '../store/useTwinStore';
-import { Save, CheckCircle } from 'lucide-react';
+import { Save, CheckCircle, Download } from 'lucide-react';
 import Scene3D from '../components/Scene3D';
 import KpiPanel from '../components/KpiPanel';
 import KpiCharts from '../components/KpiCharts';
@@ -41,13 +41,14 @@ export default function TwinView() {
         activePanel, setActivePanel,
         selectedComponentId, selectComponent,
         twinName, selectedDomain,
-        saveTwinToDb,
+        saveTwinToDb, exportDigitalTwin,
     } = useTwinStore();
 
     const [cameraView, setCameraView] = useState('Isometric');
     const [alertsOpen, setAlertsOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [saveOk, setSaveOk] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
     const [toast, setToast] = useState(null); // { type: 'success'|'error', msg }
 
@@ -67,6 +68,18 @@ export default function TwinView() {
             showToast('error', 'Save failed — check that the backend is running');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleExport = async () => {
+        setExporting(true);
+        try {
+            await exportDigitalTwin();
+            showToast('success', 'Digital Twin exported as ZIP');
+        } catch (e) {
+            showToast('error', 'Export failed: ' + e.message);
+        } finally {
+            setExporting(false);
         }
     };
 
@@ -158,6 +171,16 @@ export default function TwinView() {
                     🔔 {critKpis.length > 0 ? `${critKpis.length} Critical` : warnKpis.length > 0 ? `${warnKpis.length} Warn` : 'No alerts'}
                 </button>
 
+                {/* Export ZIP */}
+                <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: '11px', gap: '5px' }}
+                    onClick={handleExport}
+                    disabled={exporting}
+                >
+                    {exporting ? <><Download size={13} style={{ animation: 'bounce 1s infinite' }} /> Packaging…</> : <><Download size={13} /> Export ZIP</>}
+                </button>
+
                 {/* Save twin */}
                 <button
                     className="btn btn-ghost"
@@ -214,7 +237,7 @@ export default function TwinView() {
                     </div>
 
                     {/* No data overlay */}
-                    {wsStatus !== 'live' && kpis.length === 0 && (
+                    {kpis.length === 0 && (
                         <div style={{ position: 'absolute', bottom: '50px', left: '50%', transform: 'translateX(-50%)', padding: '10px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(72,101,242,0.3)', backdropFilter: 'blur(8px)', textAlign: 'center', pointerEvents: 'none' }}>
                             <div style={{ fontSize: '18px', marginBottom: '4px' }}>📂</div>
                             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>No data source connected</div>
