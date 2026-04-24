@@ -84,20 +84,24 @@ async def assign_kpis(req: AssignRequest):
             )
 
     pool = await get_pool()
-    for a in req.assignments:
-        orange = a.rules.get("orange", [None])[0] if a.rules.get("orange") else None
-        red    = a.rules.get("red",    [None])[0] if a.rules.get("red")    else None
-        direction = a.rules.get("direction", "asc")
-        await pool.execute("""
-            INSERT INTO kpi_assignments
-              (domain, component_id, kpi_name, formula, unit, orange_threshold, red_threshold, direction, interaction)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-            ON CONFLICT (domain, component_id, kpi_name)
-            DO UPDATE SET formula=$4, unit=$5, orange_threshold=$6, red_threshold=$7, direction=$8, interaction=$9
-        """, req.domain, a.component_id, a.kpi_name, a.formula, a.unit,
-            float(orange) if orange is not None else None,
-            float(red)    if red    is not None else None,
-            direction, a.interaction)
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # Full replacement: remove stale assignments so deleted KPIs don't persist
+            await conn.execute(
+                "DELETE FROM kpi_assignments WHERE domain=$1", req.domain
+            )
+            for a in req.assignments:
+                orange = a.rules.get("orange", [None])[0] if a.rules.get("orange") else None
+                red    = a.rules.get("red",    [None])[0] if a.rules.get("red")    else None
+                direction = a.rules.get("direction", "asc")
+                await conn.execute("""
+                    INSERT INTO kpi_assignments
+                      (domain, component_id, kpi_name, formula, unit, orange_threshold, red_threshold, direction, interaction)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                """, req.domain, a.component_id, a.kpi_name, a.formula, a.unit,
+                    float(orange) if orange is not None else None,
+                    float(red)    if red    is not None else None,
+                    direction, a.interaction)
     return {"saved": len(req.assignments)}
 
 

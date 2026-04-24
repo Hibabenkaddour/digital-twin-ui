@@ -69,9 +69,9 @@ async def get_component_kpis(
     if not kpis:
         return {"data": [], "kpis": []}
 
-    # Fetch sensor history
+    # Fetch sensor history — table name from whitelist, limit parameterized
     rows = await pool.fetch(
-        f"SELECT * FROM {table} ORDER BY id DESC LIMIT {limit}"
+        f"SELECT * FROM {table} ORDER BY id DESC LIMIT $1", limit
     )
 
     def safe_eval(formula, row_dict):
@@ -120,7 +120,7 @@ async def chart_data(
     pool = await get_pool()
     table = _get_table(domain)
     rows = await pool.fetch(
-        f"SELECT * FROM {table} ORDER BY id DESC LIMIT {limit}"
+        f"SELECT * FROM {table} ORDER BY id DESC LIMIT $1", limit
     )
     data = []
     for row in reversed(rows):

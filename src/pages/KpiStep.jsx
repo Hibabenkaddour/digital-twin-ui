@@ -83,8 +83,9 @@ export default function KpiStep() {
     setLoading(false);
     if (!result) return;
     toast.success(`${valid.length} KPI(s) sauvegardés`);
-    useTwinStore.getState().clearKpis();
+    // Navigate first, then clear so the transition hides the flash
     setStep(5);
+    useTwinStore.getState().clearKpis();
   };
 
   return (

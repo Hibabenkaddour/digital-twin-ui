@@ -416,10 +416,16 @@ export default function DataSourceWizard() {
       const res = await fetch(`${BASE}/datasources/upload-csv`, { method: 'POST', body: formData });
       const data = await res.json();
       if (data.schema) {
+        const firstTable = data.schema.tables?.[0];
+        if (!firstTable?.columns?.length) {
+          setTestResult({ success: false, error: 'The CSV file is empty or contains no valid columns.' });
+          setTesting(false);
+          return;
+        }
         setConfig({ file_content: data.file_content, file_name: data.filename });
         setSchema(data.schema);
         setPreview(data.preview || []);
-        setPreviewTable(data.schema.tables?.[0]?.name || '');
+        setPreviewTable(firstTable.name || '');
         setTestResult({ success: true, message: `Parsed ${data.preview?.length || 0} rows from ${data.filename}` });
       }
     } catch (err) {

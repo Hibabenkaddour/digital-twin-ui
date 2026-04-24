@@ -27,6 +27,16 @@ export default function useKpiWebSocket(domain = 'factory') {
   const reconnectTimer = useRef(null);
   const retryDelay     = useRef(1000);
   const mounted        = useRef(true);
+  // Tracks the domain that the current WebSocket was opened for.
+  // Prevents stale messages from a closing WS polluting the new domain's state.
+  const activeDomainRef = useRef(domain);
+
+  // When domain changes, clear stale KPI data immediately so the old domain's
+  // values never appear under the new domain.
+  useEffect(() => {
+    activeDomainRef.current = domain;
+    useTwinStore.getState().clearKpis();
+  }, [domain]);
 
   // Ref pattern : évite de mettre updateKpiFromWS dans les dépendances de useCallback.
   // Sans ça, chaque update du store crée une nouvelle référence de fonction → connect()
@@ -49,6 +59,8 @@ export default function useKpiWebSocket(domain = 'factory') {
 
       ws.onmessage = (event) => {
         if (!mounted.current) return;
+        // Drop messages from a stale WS that was opened for a different domain
+        if (activeDomainRef.current !== domain) return;
         try {
           const msg = JSON.parse(event.data);
           const handler = updateKpiFromWSRef.current;

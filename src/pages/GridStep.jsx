@@ -64,7 +64,9 @@ export default function GridStep() {
       const store = useTwinStore.getState();
       let customCount = 0;
       result.newState.components.forEach(comp => {
-        const existing = components.find(c => c.id === comp.id);
+        // Read fresh state inside the loop so each addComponent sees the latest occupancy map
+        const liveComponents = useTwinStore.getState().components;
+        const existing = liveComponents.find(c => c.id === comp.id);
         if (!existing) {
           store.addComponent(comp.type, { row: comp.row, col: comp.col, name: comp.name, color: comp.color, gridSize: comp.gridSize, isCustom: comp.isCustom || false, icon: comp.icon || '', description: comp.description || '', mesh3D: comp.mesh3D || null });
           if (comp.isCustom) customCount++;
@@ -72,6 +74,7 @@ export default function GridStep() {
           store.moveComponent(comp.id, comp.col, comp.row);
         }
       });
+      // Remove components from the old state that the AI dropped
       components.forEach(c => {
         if (!result.newState.components.find(nc => nc.id === c.id))
           useTwinStore.getState().removeComponent?.(c.id);

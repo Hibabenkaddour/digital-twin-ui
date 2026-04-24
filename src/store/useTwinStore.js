@@ -39,8 +39,6 @@ export const DOMAINS = {
 const getBlueprint = (domain, type) =>
   DOMAINS[domain]?.components.find(c => c.type === type);
 
-let compIdCounter = 100;
-
 const useTwinStore = create((set, get) => ({
   currentStep: 0,
   selectedDomain: null,
@@ -52,7 +50,6 @@ const useTwinStore = create((set, get) => ({
   cellSize: 6,
 
   twins: [],
-  activeTwinId: null,
 
   components: [],
   connections: [],
@@ -90,7 +87,8 @@ const useTwinStore = create((set, get) => ({
   hoverComponent:  (id) => set({ hoveredComponentId: id }),
   setActivePanel:  (p)  => set({ activePanel: p }),
 
-  initScene: () => set({ components: [], connections: [], kpis: [], kpiHistory: [] }),
+  // Fix #6: reset twins to avoid unbounded growth when user re-creates
+  initScene: () => set({ components: [], connections: [], kpis: [], kpiHistory: [], twins: [] }),
 
   addComponent: (type, overrides = {}) => {
     const { selectedDomain, gridCols, gridRows, components } = get();
@@ -104,11 +102,15 @@ const useTwinStore = create((set, get) => ({
           occupied.add(`${r}-${cl}`);
     });
 
+    // Fix #16: unique ID via timestamp+random; readable name via per-type counter
+    const typeCount = components.filter(c => c.type === type).length + 1;
+    const uid = Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2, 5);
+
     if (overrides.row !== undefined && overrides.col !== undefined) {
       const newComp = {
-        id: `${type}_${++compIdCounter}`,
+        id: `${type}_${uid}`,
         type,
-        name: overrides.name || `${bp.name} ${compIdCounter}`,
+        name: overrides.name || `${bp.name} ${typeCount}`,
         gridSize: overrides.gridSize || bp.gridSize,
         color: overrides.color || bp.color,
         col: overrides.col, row: overrides.row,
@@ -129,7 +131,7 @@ const useTwinStore = create((set, get) => ({
           for (let c = col; c < col + w && ok; c++)
             if (occupied.has(`${r}-${c}`)) ok = false;
         if (ok) {
-          const newComp = { id: `${type}_${++compIdCounter}`, type, name: `${bp.name} ${compIdCounter}`, gridSize: bp.gridSize, color: bp.color, col, row, kpiIds: [] };
+          const newComp = { id: `${type}_${uid}`, type, name: `${bp.name} ${typeCount}`, gridSize: bp.gridSize, color: bp.color, col, row, kpiIds: [] };
           set(s => ({ components: [...s.components, newComp] }));
           return;
         }
@@ -270,10 +272,14 @@ const useTwinStore = create((set, get) => ({
       newPoint[k.id]   = v;
       newPoint[k.name] = v;  // allow Chart dataKey by name
     });
-    // Update connection flow_status if reading contains it
+    // Update flow_status only on connections involving this specific component
     let newConnections = s.connections;
-    if (reading.flowStatus) {
-      newConnections = s.connections.map(cn => ({ ...cn, flowStatus: reading.flowStatus }));
+    if (reading.flowStatus && reading.componentId) {
+      newConnections = s.connections.map(cn =>
+        (cn.sourceId === reading.componentId || cn.targetId === reading.componentId)
+          ? { ...cn, flowStatus: reading.flowStatus }
+          : cn
+      );
     }
     return { kpis: newKpis, kpiHistory: [...s.kpiHistory.slice(-59), newPoint], components: newComponents, connections: newConnections };
   }),
@@ -281,7 +287,7 @@ const useTwinStore = create((set, get) => ({
   createTwin: () => {
     const { twinName, selectedDomain, width, length, gridCols, gridRows } = get();
     const newTwin = { id: `twin_${Date.now()}`, name: twinName || `${DOMAINS[selectedDomain]?.label} Twin`, domain: selectedDomain, width, length, gridCols, gridRows };
-    set(s => ({ twins: [...s.twins, newTwin], activeTwinId: newTwin.id }));
+    set(s => ({ twins: [...s.twins, newTwin] }));
   },
 
   loadDemo: () => {

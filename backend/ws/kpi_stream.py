@@ -64,7 +64,8 @@ async def _send(websocket: WebSocket, payload: dict) -> bool:
     try:
         await websocket.send_text(json.dumps(payload))
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug("WebSocket send failed (client likely disconnected): %s", e)
         return False
 
 
@@ -86,9 +87,9 @@ async def kpi_ws_handler(websocket: WebSocket, domain: str):
         kpis = [dict(r) for r in kpi_rows]
 
         # ── Send snapshot (last 60 rows evaluated) ────────────
-        # table provient exclusivement de DOMAIN_TABLE (valeurs fixes)
+        # table name from whitelist, row count parameterized
         history = await pool.fetch(
-            f"SELECT * FROM {table} ORDER BY id DESC LIMIT 60"
+            f"SELECT * FROM {table} ORDER BY id DESC LIMIT $1", 60
         )
         snapshot_readings = []
         for h_row in reversed(history):
@@ -122,7 +123,7 @@ async def kpi_ws_handler(websocket: WebSocket, domain: str):
             await asyncio.sleep(30)
 
             latest = await pool.fetchrow(
-                f"SELECT * FROM {table} ORDER BY id DESC LIMIT 1"
+                f"SELECT * FROM {table} ORDER BY id DESC LIMIT $1", 1
             )
             if not latest:
                 continue

@@ -6,7 +6,11 @@ const _loadFromStorage = () => {
   catch { return []; }
 };
 
-const useSessionStore = create((set) => ({
+const useSessionStore = create((set) => {
+  // Closure variable to track the reset timeout and prevent early clearing
+  let _saveTimeout = null;
+
+  return {
   savedSessions: _loadFromStorage(),
   sessionSaved: false,
 
@@ -39,8 +43,9 @@ const useSessionStore = create((set) => ({
     if (idx >= 0) existing[idx] = session; else existing.unshift(session);
     const updated = existing.slice(0, 10);
     localStorage.setItem('dt2_sessions', JSON.stringify(updated));
+    if (_saveTimeout) clearTimeout(_saveTimeout);
     set({ savedSessions: updated, sessionSaved: true });
-    setTimeout(() => set({ sessionSaved: false }), 2500);
+    _saveTimeout = setTimeout(() => { _saveTimeout = null; set({ sessionSaved: false }); }, 2500);
   },
 
   loadSession: (id) => {
@@ -52,6 +57,8 @@ const useSessionStore = create((set) => ({
       currentStep: 5,
       kpiHistory: [],
       selectedComponentId: null,
+      hoveredComponentId: null,
+      activePanel: session.snapshot.activePanel || 'kpi',
     });
   },
 
@@ -60,6 +67,7 @@ const useSessionStore = create((set) => ({
     localStorage.setItem('dt2_sessions', JSON.stringify(updated));
     return { savedSessions: updated };
   }),
-}));
+  };
+});
 
 export default useSessionStore;

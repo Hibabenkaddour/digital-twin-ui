@@ -33,12 +33,12 @@ function KpiPanel({ kpis, components }) {
     </div>
   );
 
-  // Group by component
+  // Group by component; orphaned KPIs (deleted component) go to a visible warning group
   const byComp = {};
   kpis.forEach(k => {
     const comp = components.find(c => c.kpiIds?.includes(k.id));
-    const key = comp?.name || 'General';
-    if (!byComp[key]) byComp[key] = { color: comp?.color || '#4865f2', kpis: [] };
+    const key = comp?.name || '⚠ Unassigned';
+    if (!byComp[key]) byComp[key] = { color: comp?.color || '#94a3b8', kpis: [], orphan: !comp };
     byComp[key].kpis.push(k);
   });
 
@@ -46,9 +46,10 @@ function KpiPanel({ kpis, components }) {
     <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
       {Object.entries(byComp).map(([compName, group]) => (
         <div key={compName} style={{ marginBottom: '12px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: group.orphan ? '#94a3b8' : 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: group.color, display: 'inline-block', flexShrink: 0 }} />
             {compName}
+            {group.orphan && <span style={{ fontSize: '9px', fontWeight: 400, color: '#94a3b8', textTransform: 'none' }}>— component removed</span>}
           </div>
           {group.kpis.map(k => {
             const color = STATUS_COLORS[k.status] || '#64748b';
@@ -96,10 +97,9 @@ function ChartsPanel({ kpis, kpiHistory, selectedDomain }) {
     finally { setLoading(false); }
   }, [selectedDomain]);
 
-  useEffect(() => { fetchChartData(); }, [fetchChartData]);
-
-  // Refresh every 5 s
+  // Single effect: initial fetch + 5-second refresh; recreates only when domain changes
   useEffect(() => {
+    fetchChartData();
     const t = setInterval(fetchChartData, 5000);
     return () => clearInterval(t);
   }, [fetchChartData]);
@@ -242,6 +242,8 @@ function ChatPanel({ selectedDomain }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
+  // Ref-based guard prevents double-submit when user clicks Send twice rapidly
+  const sendingRef = useRef(false);
 
   const BASE = import.meta.env.VITE_API_URL || '';
 
@@ -260,13 +262,14 @@ function ChatPanel({ selectedDomain }) {
 
   const send = async (text) => {
     const q = (text || input).trim();
-    if (!q || loading) return;
+    if (!q || sendingRef.current) return;
+    sendingRef.current = true;
+    setLoading(true);
     setInput('');
 
-    // Add user message
+    // Add user message; cap history to 200 to avoid unbounded growth
     const userMsg = { id: Date.now(), role: 'user', text: q };
-    setMessages(prev => [...prev, userMsg]);
-    setLoading(true);
+    setMessages(prev => [...prev, userMsg].slice(-200));
 
     try {
       const res = await fetch(`${BASE}/nlq/ask`, {
@@ -289,14 +292,15 @@ function ChatPanel({ selectedDomain }) {
         model: data.model,
         dataRows: data.dataRows,
       };
-      setMessages(prev => [...prev, aiMsg]);
+      setMessages(prev => [...prev, aiMsg].slice(-200));
     } catch (err) {
       setMessages(prev => [...prev, {
         id: Date.now() + 1, role: 'assistant',
         text: `❌ **Error:** ${err.message}\n\nMake sure the backend is running (\`docker compose up -d\`).`,
         charts: [],
-      }]);
+      }].slice(-200));
     } finally {
+      sendingRef.current = false;
       setLoading(false);
     }
   };
@@ -596,7 +600,7 @@ export default function TwinView() {
     if (wsStatus === STATUS.LIVE) return;
     const t = setInterval(updateKpiValues, 5000);
     return () => clearInterval(t);
-  }, [wsStatus, STATUS.LIVE]);
+  }, [wsStatus, updateKpiValues]);
 
   // Auto-switch to Charts when a KPI enters critical
   useEffect(() => {
