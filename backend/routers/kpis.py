@@ -4,8 +4,13 @@ GET /kpis/summary              → counts by status
 GET /kpis/{component_id}       → time-series history for charts
 GET /analytics/chart-data      → all columns time-series for a domain (for Charts tab)
 """
-from fastapi import APIRouter, Query
+import logging
+import numexpr
+import numpy
+from fastapi import APIRouter, Query, HTTPException
 from db.connection import get_pool
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["kpis"])
 
@@ -16,12 +21,24 @@ DOMAIN_TABLE = {
 }
 
 
+def _get_table(domain: str) -> str:
+    """Résoud le nom de table à partir du domaine. Lève 400 si domaine inconnu."""
+    table = DOMAIN_TABLE.get(domain)
+    if table is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Domaine invalide '{domain}'. Valeurs acceptées : {list(DOMAIN_TABLE)}"
+        )
+    return table
+
+
 @router.get("/kpis/summary")
 async def kpi_summary():
     """Return total row counts per domain as a simple health check."""
     pool = await get_pool()
     result = {}
     for domain, table in DOMAIN_TABLE.items():
+        # table provient exclusivement du dict DOMAIN_TABLE (valeurs fixes)
         row = await pool.fetchrow(f"SELECT COUNT(*) as cnt FROM {table}")
         result[domain] = row["cnt"] if row else 0
     return result
@@ -32,14 +49,14 @@ async def get_component_kpis(
     component_id: str,
     domain: str = Query("factory"),
     kpi_name: str = Query(None),
-    limit: int = Query(120),
+    limit: int = Query(120, ge=1, le=500),
 ):
     """
     Returns evaluated KPI history for a specific component.
     Works by fetching sensor rows then evaluating stored formulas.
     """
     pool = await get_pool()
-    table = DOMAIN_TABLE.get(domain, "factory_data")
+    table = _get_table(domain)
 
     # Get KPI formulas for this component
     q = "SELECT * FROM kpi_assignments WHERE domain=$1 AND component_id=$2"
@@ -57,7 +74,6 @@ async def get_component_kpis(
         f"SELECT * FROM {table} ORDER BY id DESC LIMIT {limit}"
     )
 
-    import numexpr, numpy
     def safe_eval(formula, row_dict):
         try:
             local_vars = {k: float(v) for k, v in row_dict.items() if v is not None and isinstance(v, (int, float))}
@@ -93,13 +109,16 @@ async def get_component_kpis(
 
 
 @router.get("/analytics/chart-data")
-async def chart_data(domain: str = Query("factory"), limit: int = Query(60)):
+async def chart_data(
+    domain: str = Query("factory"),
+    limit: int = Query(60, ge=1, le=500),
+):
     """
     Returns raw sensor columns for the Charts tab.
     Frontend can render any column as a line chart.
     """
     pool = await get_pool()
-    table = DOMAIN_TABLE.get(domain, "factory_data")
+    table = _get_table(domain)
     rows = await pool.fetch(
         f"SELECT * FROM {table} ORDER BY id DESC LIMIT {limit}"
     )

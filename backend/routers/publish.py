@@ -5,11 +5,16 @@ CRUD: create, list, get, update, delete. Supports version history and rollback.
 """
 import json
 import uuid
+import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
+from passlib.context import CryptContext
 from pydantic import BaseModel
 from typing import Optional
 from db.connection import get_pool
+
+logger = logging.getLogger(__name__)
+_pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router = APIRouter(prefix="/publish", tags=["publish"])
 
@@ -39,6 +44,11 @@ async def publish_dashboard(req: PublishRequest):
     pub_id = f"pub_{uuid.uuid4().hex[:10]}"
     now = datetime.utcnow()
 
+    # Hacher le mot de passe si présent (ne jamais stocker en clair)
+    stored_password = None
+    if req.access_type == "password" and req.access_password:
+        stored_password = _pwd_ctx.hash(req.access_password)
+
     await pool.execute("""
         INSERT INTO published_dashboards
         (id, name, domain, config, theme, access_type, access_password, version, is_draft, published_at, updated_at)
@@ -46,7 +56,7 @@ async def publish_dashboard(req: PublishRequest):
     """,
         pub_id, req.name, req.domain,
         json.dumps(req.config), json.dumps(req.theme or {}),
-        req.access_type, req.access_password,
+        req.access_type, stored_password,
         now,
     )
 
@@ -91,9 +101,22 @@ async def get_published(pub_id: str, password: Optional[str] = None):
 
     r = dict(row)
 
-    # Access control
+    # Access control — vérification bcrypt avec migration transparente des anciens mots de passe en clair
     if r["access_type"] == "password" and r["access_password"]:
-        if password != r["access_password"]:
+        stored = r["access_password"]
+        if stored.startswith("$2"):
+            # Hash bcrypt — vérification normale
+            ok = _pwd_ctx.verify(password or "", stored)
+        else:
+            # Ancien mot de passe en clair — comparaison puis migration vers bcrypt
+            ok = (password == stored)
+            if ok:
+                new_hash = _pwd_ctx.hash(stored)
+                await pool.execute(
+                    "UPDATE published_dashboards SET access_password=$1 WHERE id=$2",
+                    new_hash, pub_id,
+                )
+        if not ok:
             raise HTTPException(status_code=403, detail="Password required")
 
     return {
@@ -129,7 +152,9 @@ async def update_published(pub_id: str, req: UpdatePublishRequest):
     if req.access_type is not None:
         updates.append(f"access_type = ${idx}"); values.append(req.access_type); idx += 1
     if req.access_password is not None:
-        updates.append(f"access_password = ${idx}"); values.append(req.access_password); idx += 1
+        # Hacher le nouveau mot de passe avant mise à jour
+        hashed = _pwd_ctx.hash(req.access_password) if req.access_password else None
+        updates.append(f"access_password = ${idx}"); values.append(hashed); idx += 1
     if req.is_draft is not None:
         updates.append(f"is_draft = ${idx}"); values.append(req.is_draft); idx += 1
 

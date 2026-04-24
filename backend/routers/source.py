@@ -4,9 +4,10 @@ GET  /source/schema?domain=   → column names for KPI builder
 POST /source/assign           → save KPI formula assignments
 POST /source/propose_kpis     → mock AI KPI suggestions
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from db.connection import get_pool
+from utils.formula import validate_formula
 
 router = APIRouter(prefix="/source", tags=["source"])
 
@@ -70,6 +71,18 @@ class AssignRequest(BaseModel):
 
 @router.post("/assign")
 async def assign_kpis(req: AssignRequest):
+    allowed_columns = DOMAIN_COLUMNS.get(req.domain, [])
+    if not allowed_columns:
+        raise HTTPException(status_code=400, detail=f"Domaine inconnu : {req.domain}")
+
+    for a in req.assignments:
+        valid, error = validate_formula(a.formula, allowed_columns)
+        if not valid:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Formule invalide pour '{a.kpi_name}' : {error}"
+            )
+
     pool = await get_pool()
     for a in req.assignments:
         orange = a.rules.get("orange", [None])[0] if a.rules.get("orange") else None

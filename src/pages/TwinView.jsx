@@ -5,6 +5,7 @@ import {
   AreaChart, Area
 } from 'recharts';
 import useTwinStore from '../store/useTwinStore';
+import useSessionStore from '../store/useSessionStore';
 import Scene3D from '../components/Scene3D';
 import useKpiWebSocket from '../hooks/useKpiWebSocket';
 
@@ -581,8 +582,9 @@ export default function TwinView() {
     activePanel, setActivePanel,
     selectedComponentId, selectComponent,
     twinName, selectedDomain,
-    saveSession, sessionSaved,
   } = useTwinStore();
+
+  const { saveSession, sessionSaved } = useSessionStore();
 
   const [cameraView, setCameraView] = useState('Isometric');
   const [alertsOpen, setAlertsOpen] = useState(false);

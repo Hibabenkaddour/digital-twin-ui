@@ -4,13 +4,21 @@ Registers all routers, WebSocket, CORS, and background simulator.
 """
 import os
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 from db.connection import get_pool, close_pool
+from db.migrate import run_migrations
 from routers import source, layout, kpis, nlq, datasources, publish
 from ws.kpi_stream import kpi_ws_handler
 from simulator.data_gen import run_simulator
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 _sim_task: asyncio.Task | None = None
 
@@ -19,15 +27,16 @@ _sim_task: asyncio.Task | None = None
 async def lifespan(app: FastAPI):
     # ── Startup ──────────────────────────────────────────────
     global _sim_task
-    await get_pool()                     # warm up DB pool
+    pool = await get_pool()
+    await run_migrations(pool)           # appliquer les migrations en attente
     _sim_task = asyncio.create_task(run_simulator())
-    print("[Backend] Started — simulator running")
+    logger.info("Backend démarré — simulateur en cours d'exécution")
     yield
     # ── Shutdown ─────────────────────────────────────────────
     if _sim_task:
         _sim_task.cancel()
     await close_pool()
-    print("[Backend] Shutdown")
+    logger.info("Backend arrêté")
 
 
 app = FastAPI(
@@ -37,7 +46,12 @@ app = FastAPI(
 )
 
 # ── CORS (env-based, production-safe) ─────────────────────────
-_cors_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175,*")
+# Le wildcard '*' est intentionnellement retiré du fallback.
+# En production, définir ALLOWED_ORIGINS dans le .env.
+_cors_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:5174,http://localhost:5175"
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _cors_origins.split(",")],

@@ -27,7 +27,12 @@ export default function useKpiWebSocket(domain = 'factory') {
   const reconnectTimer = useRef(null);
   const retryDelay     = useRef(1000);
   const mounted        = useRef(true);
-  const { updateKpiFromWS } = useTwinStore();
+
+  // Ref pattern : évite de mettre updateKpiFromWS dans les dépendances de useCallback.
+  // Sans ça, chaque update du store crée une nouvelle référence de fonction → connect()
+  // se recrée → useEffect se relance → reconnexion WebSocket infinie.
+  const updateKpiFromWSRef = useRef(null);
+  updateKpiFromWSRef.current = useTwinStore.getState().updateKpiFromWS;
 
   const connect = useCallback(() => {
     if (!mounted.current) return;
@@ -46,9 +51,10 @@ export default function useKpiWebSocket(domain = 'factory') {
         if (!mounted.current) return;
         try {
           const msg = JSON.parse(event.data);
+          const handler = updateKpiFromWSRef.current;
           if (msg.type === 'ping') { ws.send(JSON.stringify({ type: 'ping' })); return; }
-          if (msg.type === 'snapshot') { msg.readings?.forEach(r => updateKpiFromWS?.(r)); setLastUpdate(new Date()); return; }
-          if (msg.type === 'kpi') { updateKpiFromWS?.(msg); setLastUpdate(new Date()); setMessageCount(c => c + 1); }
+          if (msg.type === 'snapshot') { msg.readings?.forEach(r => handler?.(r)); setLastUpdate(new Date()); return; }
+          if (msg.type === 'kpi') { handler?.(msg); setLastUpdate(new Date()); setMessageCount(c => c + 1); }
         } catch {}
       };
 
@@ -63,7 +69,7 @@ export default function useKpiWebSocket(domain = 'factory') {
 
       ws.onerror = () => { setStatus(STATUS.OFFLINE); ws.close(); };
     } catch { setStatus(STATUS.OFFLINE); }
-  }, [domain, updateKpiFromWS]);
+  }, [domain]); // domain est la seule vraie dépendance
 
   useEffect(() => {
     mounted.current = true;

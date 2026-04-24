@@ -15,6 +15,8 @@ import KpiStep from './pages/KpiStep';
 import TwinView from './pages/TwinView';
 import DataSourceWizard from './pages/DataSourceWizard';
 import PublishedView from './pages/PublishedView';
+import ToastContainer from './components/ToastContainer';
+import ErrorBoundary from './components/ErrorBoundary';
 
 /* ── Admin app (step-based navigation) ── */
 function AdminApp() {
@@ -63,9 +65,12 @@ function PublishedApp() {
 /* ── Root Router ── */
 export default function App() {
   return (
-    <Routes>
-      <Route path="/view/:pubId" element={<PublishedApp />} />
-      <Route path="/*" element={<AdminApp />} />
-    </Routes>
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/view/:pubId" element={<PublishedApp />} />
+        <Route path="/*" element={<AdminApp />} />
+      </Routes>
+      <ToastContainer />
+    </ErrorBoundary>
   );
 }

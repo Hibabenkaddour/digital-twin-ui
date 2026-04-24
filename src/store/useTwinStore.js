@@ -62,14 +62,6 @@ const useTwinStore = create((set, get) => ({
   hoveredComponentId: null,
   activePanel: 'kpi',
 
-  // Persisted sessions (localStorage)
-  savedSessions: (() => { try { return JSON.parse(localStorage.getItem('dt2_sessions') || '[]'); } catch { return []; } })(),
-  sessionSaved: false,   // flash feedback flag
-
-  chatMessages: [
-    { id: 0, role: 'assistant', text: '👋 Hello! I\'m your Analytics AI.\n\nAsk me anything about your digital twin KPIs.' }
-  ],
-
   setStep: (step) => set(s => ({
     currentStep: step,
     selectedComponentId: s.currentStep !== step ? null : s.selectedComponentId
@@ -286,27 +278,6 @@ const useTwinStore = create((set, get) => ({
     return { kpis: newKpis, kpiHistory: [...s.kpiHistory.slice(-59), newPoint], components: newComponents, connections: newConnections };
   }),
 
-  sendMessage: (text) => {
-    const msgId = Date.now();
-    set(s => ({ chatMessages: [...s.chatMessages, { id: msgId, role: 'user', text }] }));
-    setTimeout(() => {
-      const { kpis } = get();
-      const criticals = kpis.filter(k => k.status === 'red');
-      const warnings  = kpis.filter(k => k.status === 'orange');
-      const normals   = kpis.filter(k => k.status === 'green');
-      const lower     = text.toLowerCase();
-      let response    = `🤖 I can help you analyze your digital twin data. Try asking:\n\n• "What is the system status?"\n• "Are there any critical alerts?"\n• "What actions do you recommend?"`;
-      if (lower.includes('status') || lower.includes('overview')) {
-        response = `📊 **System Status Overview**\n\n✅ ${normals.length} KPIs normal\n⚠️ ${warnings.length} KPIs warning\n🚨 ${criticals.length} KPIs critical`;
-      } else if (lower.includes('critical') || lower.includes('alert')) {
-        response = criticals.length === 0
-          ? '✅ No critical KPIs. All systems within safe thresholds.'
-          : `🚨 **Critical KPIs:**\n\n${criticals.map(k => `• **${k.name}**: ${k.value} ${k.unit}`).join('\n')}`;
-      }
-      set(s => ({ chatMessages: [...s.chatMessages, { id: msgId + 1, role: 'assistant', text: response }] }));
-    }, 700);
-  },
-
   createTwin: () => {
     const { twinName, selectedDomain, width, length, gridCols, gridRows } = get();
     const newTwin = { id: `twin_${Date.now()}`, name: twinName || `${DOMAINS[selectedDomain]?.label} Twin`, domain: selectedDomain, width, length, gridCols, gridRows };
@@ -318,58 +289,6 @@ const useTwinStore = create((set, get) => ({
     get().initScene();
   },
 
-  // ─── Session persistence ──────────────────────────────────────
-  saveSession: () => {
-    const s = get();
-    const id = `session_${Date.now()}`;
-    const session = {
-      id,
-      name: s.twinName || 'Unnamed Twin',
-      domain: s.selectedDomain || 'factory',
-      savedAt: new Date().toISOString(),
-      stats: {
-        components: s.components.length,
-        connections: s.connections.length,
-        kpis: s.kpis.length,
-      },
-      snapshot: {
-        twinName: s.twinName,
-        selectedDomain: s.selectedDomain,
-        width: s.width, length: s.length,
-        gridCols: s.gridCols, gridRows: s.gridRows, cellSize: s.cellSize,
-        components: s.components,
-        connections: s.connections,
-        kpis: s.kpis,
-        activePanel: s.activePanel,
-      },
-    };
-    const existing = (() => { try { return JSON.parse(localStorage.getItem('dt2_sessions') || '[]'); } catch { return []; } })();
-    // Replace if same name+domain, otherwise prepend
-    const idx = existing.findIndex(e => e.name === session.name && e.domain === session.domain);
-    if (idx >= 0) existing[idx] = session; else existing.unshift(session);
-    const updated = existing.slice(0, 10);
-    localStorage.setItem('dt2_sessions', JSON.stringify(updated));
-    set({ savedSessions: updated, sessionSaved: true });
-    setTimeout(() => set({ sessionSaved: false }), 2500);
-  },
-
-  loadSession: (id) => {
-    const sessions = (() => { try { return JSON.parse(localStorage.getItem('dt2_sessions') || '[]'); } catch { return []; } })();
-    const session = sessions.find(s => s.id === id);
-    if (!session?.snapshot) return;
-    set({
-      ...session.snapshot,
-      currentStep: 5,
-      kpiHistory: [],
-      selectedComponentId: null,
-    });
-  },
-
-  deleteSession: (id) => set(s => {
-    const updated = s.savedSessions.filter(x => x.id !== id);
-    localStorage.setItem('dt2_sessions', JSON.stringify(updated));
-    return { savedSessions: updated };
-  }),
 }));
 
 export default useTwinStore;

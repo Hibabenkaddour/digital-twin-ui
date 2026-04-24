@@ -1,0 +1,15 @@
+-- Migration NNN : description courte
+-- Auteur : <nom>
+-- Date   : YYYY-MM-DD
+--
+-- Toujours utiliser des opérations idempotentes :
+--   CREATE TABLE IF NOT EXISTS ...
+--   ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...
+--   CREATE INDEX IF NOT EXISTS ...
+--   DROP TABLE IF EXISTS ...
+--
+-- Ne JAMAIS modifier une migration déjà appliquée en production.
+-- Créer une nouvelle migration à la place.
+
+-- Exemple : ajout d'une colonne
+-- ALTER TABLE published_dashboards ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0;

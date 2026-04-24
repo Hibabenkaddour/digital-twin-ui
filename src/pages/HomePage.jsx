@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import useTwinStore, { DOMAINS } from '../store/useTwinStore';
+import useSessionStore from '../store/useSessionStore';
 import { Play, Layers, Sparkles, Clock, Trash2, ArrowRight, Database } from 'lucide-react';
+import { safeApiFetch } from '../services/api';
 
 const DOMAIN_ICONS  = { factory: '🏭', airport: '✈️', warehouse: '📦' };
 const DOMAIN_COLORS = { factory: '#f97316', airport: '#06b6d4', warehouse: '#84cc16' };
@@ -21,15 +23,14 @@ function timeAgo(iso) {
 }
 
 export default function HomePage() {
-  const { setStep, loadDemo, twins, savedSessions, loadSession, deleteSession } = useTwinStore();
+  const { setStep, loadDemo, twins } = useTwinStore();
+  const { savedSessions, loadSession, deleteSession } = useSessionStore();
   const [published, setPublished] = useState([]);
   const BASE = import.meta.env.VITE_API_URL || '';
 
   useEffect(() => {
-    fetch(`${BASE}/publish/list`)
-      .then(r => r.ok ? r.json() : { dashboards: [] })
-      .then(d => setPublished(d.dashboards || []))
-      .catch(() => {});
+    safeApiFetch('/publish/list')
+      .then(d => d && setPublished(d.dashboards || []));
   }, []);
 
   return (

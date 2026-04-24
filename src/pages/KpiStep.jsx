@@ -1,24 +1,22 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ArrowLeft, Database, Plus, Trash2 } from 'lucide-react';
 import useTwinStore from '../store/useTwinStore';
-
-const BASE_URL = import.meta.env.VITE_API_URL || '';
+import { safeApiFetch } from '../services/api';
+import { toast } from '../store/useToastStore';
 
 export default function KpiStep() {
   const { setStep, components, selectedDomain } = useTwinStore();
   const [columns,     setColumns]     = useState([]);
   const [assignments, setAssignments] = useState([]);
-  const [loading,     setLoading]     = useState(false);
-  const [aiLoading,   setAiLoading]   = useState(false);
-  const [error,       setError]       = useState('');
+  const [loading,   setLoading]   = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`${BASE_URL}/source/schema?domain=${selectedDomain}`)
-      .then(r => r.json())
+    safeApiFetch(`/source/schema?domain=${selectedDomain}`, {}, 'Impossible de charger le schéma depuis le backend')
       .then(data => {
+        if (!data) return;
         setColumns(data.columns || []);
         const savedAssig = data.assignments || {};
-        // Transform server flat fields → local nested rules structure
         const arr = Object.entries(savedAssig).map(([kpi_id, val]) => ({
           kpi_id,
           component_id: val.component_id || '',
@@ -33,8 +31,7 @@ export default function KpiStep() {
           },
         }));
         if (arr.length > 0) setAssignments(arr);
-      })
-      .catch(e => setError('Failed to connect to backend: ' + e.message));
+      });
   }, [selectedDomain]);
 
   const addKpi = () => setAssignments([...assignments, {
@@ -44,25 +41,23 @@ export default function KpiStep() {
 
   const handleSuggestKpis = async () => {
     if (!columns.length) return;
-    setAiLoading(true); setError('');
-    try {
-      const res = await fetch(`${BASE_URL}/source/propose_kpis`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: selectedDomain, columns }),
-      });
-      const data = await res.json();
-      if (data && data.kpis) {
-        const newAssignments = data.kpis.map(k => ({
-          kpi_id: `kpi_${Date.now()}_${Math.random().toString(36).substring(2,7)}`,
-          component_id: components[0]?.id || '', kpi_name: k.kpi_name || 'AI KPI',
-          formula: k.formula || '', unit: k.unit || '',
-          rules: { orange: [k.orange ?? null, null], red: [k.red ?? null, null], direction: k.direction || 'asc' },
-          interaction: k.interaction || 'pulse',
-        }));
-        setAssignments(prev => [...prev, ...newAssignments]);
-      }
-    } catch (err) { setError('Failed to fetch AI suggestions: ' + err.message); }
-    finally { setAiLoading(false); }
+    setAiLoading(true);
+    const data = await safeApiFetch(
+      '/source/propose_kpis',
+      { method: 'POST', body: JSON.stringify({ domain: selectedDomain, columns }) },
+      'Impossible de récupérer les suggestions IA'
+    );
+    if (data?.kpis) {
+      const newAssignments = data.kpis.map(k => ({
+        kpi_id: `kpi_${Date.now()}_${Math.random().toString(36).substring(2,7)}`,
+        component_id: components[0]?.id || '', kpi_name: k.kpi_name || 'AI KPI',
+        formula: k.formula || '', unit: k.unit || '',
+        rules: { orange: [k.orange ?? null, null], red: [k.red ?? null, null], direction: k.direction || 'asc' },
+        interaction: k.interaction || 'pulse',
+      }));
+      setAssignments(prev => [...prev, ...newAssignments]);
+    }
+    setAiLoading(false);
   };
 
   const updateKpi  = (id, field, value) => setAssignments(prev => prev.map(a => a.kpi_id === id ? { ...a, [field]: value } : a));
@@ -79,17 +74,17 @@ export default function KpiStep() {
 
   const handleLaunch = async () => {
     const valid = assignments.filter(a => a.component_id && a.kpi_name && a.formula);
-    setLoading(true); setError('');
-    try {
-      const res = await fetch(`${BASE_URL}/source/assign`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: selectedDomain, assignments: valid }),
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Save failed'); }
-      useTwinStore.getState().clearKpis();
-      setStep(5);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
+    setLoading(true);
+    const result = await safeApiFetch(
+      '/source/assign',
+      { method: 'POST', body: JSON.stringify({ domain: selectedDomain, assignments: valid }) },
+      'Échec de la sauvegarde des KPIs'
+    );
+    setLoading(false);
+    if (!result) return;
+    toast.success(`${valid.length} KPI(s) sauvegardés`);
+    useTwinStore.getState().clearKpis();
+    setStep(5);
   };
 
   return (
@@ -111,7 +106,7 @@ export default function KpiStep() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
             {columns.length === 0 ? (
               <div style={{ fontSize: '11px', color: 'var(--text-2)' }}>
-                {error ? '⚠️ Backend not connected' : 'Waiting for backend…'}
+                Waiting for backend…
               </div>
             ) : columns.map(col => (
               <div key={col} style={{ padding: '8px 12px', background: 'var(--bg-2)', borderRadius: '6px', marginBottom: '8px', border: '1px solid var(--border)', fontSize: '12px', fontFamily: 'monospace', color: 'var(--accent)' }}>
@@ -136,12 +131,6 @@ export default function KpiStep() {
               </button>
             </div>
           </div>
-
-          {error && (
-            <div style={{ padding: '12px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: '12px', marginBottom: '16px', border: '1px solid rgba(239,68,68,0.3)' }}>
-              {error}
-            </div>
-          )}
 
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {assignments.length === 0 && (

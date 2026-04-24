@@ -1,6 +1,7 @@
 -- ============================================================
---  Digital Twin 2 — PostgreSQL Schema
---  Auto-run on first Docker start via docker-entrypoint-initdb.d
+--  LEGACY — Ce fichier n'est plus utilisé par Docker ni par le backend.
+--  Source de vérité : backend/db/migrations/
+--  Conservé uniquement comme référence.
 -- ============================================================
 
 -- ── Factory sensor data ──────────────────────────────────────

@@ -2,15 +2,18 @@
 ws/kpi_stream.py
 WebSocket endpoint: /ws/kpis?domain=factory|airport|warehouse
 - On connect: sends snapshot of last 60 rows as evaluated KPI values
-- Every 2 s: pushes live KPI readings based on fetched DB row + formula evaluation
+- Every 30 s: pushes live KPI readings based on fetched DB row + formula evaluation
 - Also sends flow_status for connection animations
 """
 import asyncio
 import json
+import logging
 import numexpr
 import numpy
 from fastapi import WebSocket, WebSocketDisconnect
 from db.connection import get_pool
+
+logger = logging.getLogger(__name__)
 
 DOMAIN_TABLE = {
     "factory":   "factory_data",
@@ -56,10 +59,24 @@ def _classify(value: float, orange: float | None, red: float | None, direction: 
     return "green"
 
 
+async def _send(websocket: WebSocket, payload: dict) -> bool:
+    """Envoie un message JSON. Retourne False si la connexion est fermée."""
+    try:
+        await websocket.send_text(json.dumps(payload))
+        return True
+    except Exception:
+        return False
+
+
 async def kpi_ws_handler(websocket: WebSocket, domain: str):
+    # Validation du domaine avant d'accepter la connexion
+    table = DOMAIN_TABLE.get(domain)
+    if table is None:
+        await websocket.close(code=1008, reason=f"Domaine invalide : {domain}")
+        return
+
     await websocket.accept()
     pool = await get_pool()
-    table = DOMAIN_TABLE.get(domain, "factory_data")
 
     try:
         # ── Load KPI assignments for this domain ──────────────
@@ -69,6 +86,7 @@ async def kpi_ws_handler(websocket: WebSocket, domain: str):
         kpis = [dict(r) for r in kpi_rows]
 
         # ── Send snapshot (last 60 rows evaluated) ────────────
+        # table provient exclusivement de DOMAIN_TABLE (valeurs fixes)
         history = await pool.fetch(
             f"SELECT * FROM {table} ORDER BY id DESC LIMIT 60"
         )
@@ -96,7 +114,8 @@ async def kpi_ws_handler(websocket: WebSocket, domain: str):
                     }
                 })
 
-        await websocket.send_text(json.dumps({"type": "snapshot", "readings": snapshot_readings}))
+        if not await _send(websocket, {"type": "snapshot", "readings": snapshot_readings}):
+            return
 
         # ── Live streaming loop ───────────────────────────────
         while True:
@@ -133,19 +152,21 @@ async def kpi_ws_handler(websocket: WebSocket, domain: str):
                         }
                     }
                 }
-                await websocket.send_text(json.dumps(msg))
+                if not await _send(websocket, msg):
+                    return
 
             # Also send flow_status event so connections panel updates
-            await websocket.send_text(json.dumps({
+            if not await _send(websocket, {
                 "type":       "flow",
                 "domain":     domain,
                 "flowStatus": flow,
-            }))
+            }):
+                return
 
     except WebSocketDisconnect:
         pass
     except Exception as e:
-        print(f"[WS] Error: {e}")
+        logger.error("Erreur WebSocket (domain=%s) : %s", domain, e)
         try:
             await websocket.close()
         except Exception:

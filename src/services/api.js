@@ -1,3 +1,5 @@
+import { toast } from '../store/useToastStore';
+
 const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 async function apiFetch(path, options = {}) {
@@ -30,5 +32,16 @@ export async function checkBackendHealth() {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+// Wrapper utilitaire : exécute un appel API et affiche un toast en cas d'erreur.
+// Retourne null si l'appel échoue (évite les try/catch répétitifs dans les composants).
+export async function safeApiFetch(path, options = {}, errorMessage = null) {
+  try {
+    return await apiFetch(path, options);
+  } catch (e) {
+    toast.error(errorMessage || e.message);
+    return null;
   }
 }
