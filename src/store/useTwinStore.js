@@ -351,6 +351,37 @@ const useTwinStore = create((set, get) => ({
     localStorage.setItem('dt2_sessions', JSON.stringify(updated));
     set({ savedSessions: updated, sessionSaved: true });
     setTimeout(() => set({ sessionSaved: false }), 2500);
+
+    // Also persist to backend DB so published views see live changes
+    get().saveToServer();
+  },
+
+  // ─── Server persistence (for live published links) ─────────────
+  saveToServer: async () => {
+    const s = get();
+    const BASE = import.meta.env.VITE_API_URL || '';
+    try {
+      await fetch(`${BASE}/layout/state`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'default',
+          domain: s.selectedDomain || 'factory',
+          name: s.twinName || 'Unnamed Twin',
+          state: {
+            twinName: s.twinName,
+            selectedDomain: s.selectedDomain,
+            width: s.width, length: s.length,
+            gridCols: s.gridCols, gridRows: s.gridRows, cellSize: s.cellSize,
+            components: s.components,
+            connections: s.connections,
+            kpis: s.kpis,
+          },
+        }),
+      });
+    } catch (e) {
+      console.warn('Failed to save to server:', e);
+    }
   },
 
   loadSession: (id) => {
