@@ -149,3 +149,24 @@ class ChartFromPromptRequest(BaseModel):
 class QuerySuggestion(BaseModel):
     text: str
     category: str  # trend | compare | anomaly | summary
+
+
+# ─── Share Link Schemas ────────────────────────────────────────────────────────
+
+class ShareLinkCreate(BaseModel):
+    twin_id: str
+    name: str
+    password: str
+
+class ShareLinkUpdate(BaseModel):
+    name: Optional[str] = None
+    password: Optional[str] = None
+
+class ShareLinkResponse(BaseModel):
+    id: str
+    twin_id: str
+    name: str
+    created_at: datetime
+
+class ShareLinkVerify(BaseModel):
+    password: str

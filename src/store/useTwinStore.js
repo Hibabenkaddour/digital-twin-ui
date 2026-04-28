@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { listTwins, getTwin, saveTwin as apiSaveTwin, deleteTwin as apiDeleteTwin } from '../services/api';
+import { listTwins, getTwin, saveTwin as apiSaveTwin, deleteTwin as apiDeleteTwin, listShareLinks, createShareLink, updateShareLink, deleteShareLink } from '../services/api';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -177,6 +177,7 @@ const useTwinStore = create((set, get) => ({
 
     twins: [],
     activeTwinId: null,
+    shareLinks: [],
 
     components: [],
     connections: [],
@@ -636,6 +637,49 @@ const useTwinStore = create((set, get) => ({
     loadDemo: () => {
         set({ selectedDomain: 'factory', twinName: 'Main Production Floor', width: 60, length: 42, gridCols: 10, gridRows: 7, currentStep: 5 });
         get().initScene();
+    },
+
+    // ─── Share Links CRUD ──────────────────────────────────────────────────────
+    
+    fetchShareLinks: async () => {
+        try {
+            const links = await listShareLinks();
+            set({ shareLinks: links });
+        } catch (e) {
+            console.error('Failed to fetch share links:', e.message);
+        }
+    },
+    
+    createShareLink: async (data) => {
+        try {
+            const newLink = await createShareLink(data);
+            set(s => ({ shareLinks: [...s.shareLinks, newLink] }));
+            return newLink;
+        } catch (e) {
+            console.error('Failed to create share link:', e.message);
+            throw e;
+        }
+    },
+    
+    updateShareLink: async (id, data) => {
+        try {
+            const updated = await updateShareLink(id, data);
+            set(s => ({ shareLinks: s.shareLinks.map(l => l.id === id ? updated : l) }));
+            return updated;
+        } catch (e) {
+            console.error('Failed to update share link:', e.message);
+            throw e;
+        }
+    },
+    
+    deleteShareLink: async (id) => {
+        try {
+            await deleteShareLink(id);
+            set(s => ({ shareLinks: s.shareLinks.filter(l => l.id !== id) }));
+        } catch (e) {
+            console.error('Failed to delete share link:', e.message);
+            throw e;
+        }
     },
 
     getDomains: () => DOMAINS,

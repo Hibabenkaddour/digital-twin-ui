@@ -142,6 +142,37 @@ export async function deleteTwin(twinId) {
     return apiFetch(`/twins/${twinId}`, { method: 'DELETE' });
 }
 
+// ─── Share Link API ───────────────────────────────────────────────────────────
+
+export async function createShareLink(data) {
+    return apiFetch('/share', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function listShareLinks() {
+    return apiFetch('/share');
+}
+
+export async function updateShareLink(shareId, data) {
+    return apiFetch(`/share/${shareId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function deleteShareLink(shareId) {
+    return apiFetch(`/share/${shareId}`, { method: 'DELETE' });
+}
+
+export async function verifyShareLink(shareId, password) {
+    return apiFetch(`/share/${shareId}/verify`, {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+    });
+}
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 
 export async function checkBackendHealth() {

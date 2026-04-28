@@ -58,6 +58,16 @@ class QueryHistoryDB(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class ShareLinkDB(Base):
+    __tablename__ = "share_links"
+
+    id = Column(String, primary_key=True)
+    twin_id = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 def create_tables():
     Base.metadata.create_all(bind=engine)
 

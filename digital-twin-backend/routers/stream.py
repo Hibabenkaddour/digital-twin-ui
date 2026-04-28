@@ -41,11 +41,15 @@ class ConnectionManager:
         logger.info(f"WS client connected — total: {len(self._clients)}")
         # Send snapshot of latest known values right away
         if self._latest:
-            await ws.send_text(json.dumps({
-                "type": "snapshot",
-                "readings": list(self._latest.values()),
-                "ts": datetime.now(timezone.utc).isoformat(),
-            }))
+            try:
+                await ws.send_text(json.dumps({
+                    "type": "snapshot",
+                    "readings": list(self._latest.values()),
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                }))
+                logger.info("Sent initial snapshot to client")
+            except Exception as e:
+                logger.error(f"Error sending snapshot: {e}")
 
     def disconnect(self, ws: WebSocket):
         self._clients.discard(ws)

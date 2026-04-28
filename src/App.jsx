@@ -13,9 +13,27 @@ import GridStep from './pages/GridStep';
 import ConnectionsStep from './pages/ConnectionsStep';
 import KpiStep from './pages/KpiStep';
 import TwinView from './pages/TwinView';
+import SharedTwinView from './pages/SharedTwinView';
 
 export default function App() {
   const { currentStep } = useTwinStore();
+
+  const path = window.location.pathname;
+  if (path.startsWith('/live/')) {
+    const shareId = path.split('/')[2];
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        width: '100vw',
+        overflow: 'hidden',
+        background: 'var(--bg-0)',
+      }}>
+        <SharedTwinView shareId={shareId} />
+      </div>
+    );
+  }
 
   const renderPage = () => {
     switch (currentStep) {

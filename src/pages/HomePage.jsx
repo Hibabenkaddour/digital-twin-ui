@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import useTwinStore, { DOMAINS } from '../store/useTwinStore';
-import { Play, Layers, Sparkles, Eye, Pencil, Trash2, Save, RefreshCw, AlertCircle, X } from 'lucide-react';
+import { Play, Layers, Sparkles, Eye, Pencil, Trash2, Save, RefreshCw, AlertCircle, X, Share2, Copy } from 'lucide-react';
 
 const DOMAIN_ICONS = { factory: '🏭', airport: '✈️', warehouse: '📦' };
 const DOMAIN_DESCS = {
@@ -158,15 +158,16 @@ function TwinCard({ twin, onLoad, onEdit, onDelete }) {
 }
 
 export default function HomePage() {
-    const { setStep, loadDemo, twins, fetchTwins, loadTwinFromDb, deleteTwinFromDb } = useTwinStore();
+    const { setStep, loadDemo, twins, fetchTwins, loadTwinFromDb, deleteTwinFromDb, shareLinks, fetchShareLinks, deleteShareLink } = useTwinStore();
     const [loading, setLoading] = useState(false);
     const [toDelete, setToDelete] = useState(null);
     const [actionLoading, setActionLoading] = useState(null);
     const [error, setError] = useState(null);
+    const [copiedLink, setCopiedLink] = useState(null);
 
     useEffect(() => {
         setLoading(true);
-        fetchTwins().finally(() => setLoading(false));
+        Promise.all([fetchTwins(), fetchShareLinks()]).finally(() => setLoading(false));
     }, []);
 
     const handleLoad = async (twinId) => {
@@ -307,6 +308,80 @@ export default function HomePage() {
                                 />
                             </div>
                         ))}
+                    </div>
+                )}
+
+                <div className="divider" style={{ marginBottom: '40px' }} />
+
+                {/* Share Links */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                    <div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '4px' }}>
+                            Active Share Links
+                        </div>
+                        <div style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+                            {loading ? 'Loading…' : shareLinks.length === 0 ? 'No active share links.' : `${shareLinks.length} active link${shareLinks.length > 1 ? 's' : ''}`}
+                        </div>
+                    </div>
+                </div>
+
+                {shareLinks.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px', marginBottom: '48px' }}>
+                        {shareLinks.map(link => {
+                            const linkUrl = `${window.location.origin}/live/${link.id}`;
+                            const isCopied = copiedLink === link.id;
+                            const relatedTwin = twins.find(t => t.id === link.twin_id);
+                            
+                            return (
+                                <div key={link.id} style={{ 
+                                    padding: '16px', borderRadius: '16px', border: '1px solid var(--border)', 
+                                    background: 'var(--surface-1)', display: 'flex', flexDirection: 'column', gap: '12px' 
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div>
+                                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-0)' }}>{link.name}</div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-2)' }}>Twin: {relatedTwin ? relatedTwin.name : 'Unknown'}</div>
+                                        </div>
+                                        <button 
+                                            onClick={() => deleteShareLink(link.id)}
+                                            style={{ 
+                                                background: 'none', border: 'none', color: '#ef4444', 
+                                                cursor: 'pointer', padding: '4px', borderRadius: '6px' 
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                            title="Delete Share Link"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    
+                                    <div style={{ 
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', 
+                                        background: 'var(--bg-0)', borderRadius: '8px', border: '1px solid var(--border)' 
+                                    }}>
+                                        <div style={{ flex: 1, fontSize: '11px', color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {linkUrl}
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(linkUrl);
+                                                setCopiedLink(link.id);
+                                                setTimeout(() => setCopiedLink(null), 2000);
+                                            }}
+                                            style={{ 
+                                                background: isCopied ? '#10d98d' : 'transparent', 
+                                                color: isCopied ? '#fff' : 'var(--text-2)', 
+                                                border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px',
+                                                fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px'
+                                            }}
+                                        >
+                                            <Copy size={12} /> {isCopied ? 'Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
 
