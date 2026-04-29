@@ -57,21 +57,39 @@ export async function saveLayoutState(state) {
 
 // ─── KPI API ──────────────────────────────────────────────────────────────────
 
-export async function importKpiFile(file, componentId, kpiName, { valueCol, timestampCol, unit } = {}) {
-    const form = new FormData();
-    form.append('file', file);
-    form.append('component_id', componentId);
-    form.append('kpi_name', kpiName);
-    if (valueCol) form.append('value_col', valueCol);
-    if (timestampCol) form.append('timestamp_col', timestampCol);
-    if (unit) form.append('unit', unit);
+// ─── Data Source API ─────────────────────────────────────────────────────────
 
-    const res = await fetch(`${BASE_URL}/kpis/import`, { method: 'POST', body: form });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || 'Import failed');
-    }
-    return res.json();
+export async function connectTelemetryDb(dbUrl) {
+    return apiFetch('/source/connect', {
+        method: 'POST',
+        body: JSON.stringify({ db_url: dbUrl }),
+    });
+}
+
+export async function selectTelemetryTable(tableName) {
+    return apiFetch('/source/table', {
+        method: 'POST',
+        body: JSON.stringify({ table_name: tableName }),
+    });
+}
+
+export async function getTelemetrySchema() {
+    return apiFetch('/source/schema');
+}
+
+export async function saveTelemetryAssignments(domain, assignments) {
+    return apiFetch('/source/assign', {
+        method: 'POST',
+        body: JSON.stringify({ domain, assignments }),
+    });
+}
+
+export async function disconnectTelemetry() {
+    return apiFetch('/source', { method: 'DELETE' });
+}
+
+export async function getTelemetryStatus() {
+    return apiFetch('/source/status');
 }
 
 export async function proposeKpis(domain, columns) {

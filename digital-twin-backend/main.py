@@ -70,10 +70,14 @@ async def _start_connectors():
     # Postgres connector — primary source
     saved_assignments = state.get("assignments", {})
     domain = state.get("domain", "factory")
+    telemetry_db_url = state.get("telemetry_db_url")
+    telemetry_table = state.get("telemetry_table")
 
     pc = PostgresConnector({
         "assignments": saved_assignments,
         "domain": domain,
+        "db_url": telemetry_db_url,
+        "table_name": telemetry_table,
         "poll_interval": 2.0,
     })
     _connectors.append(pc)

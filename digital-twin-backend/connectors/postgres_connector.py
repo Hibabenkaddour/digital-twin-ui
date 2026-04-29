@@ -28,19 +28,24 @@ class PostgresConnector(BaseConnector):
         global _instance
         _instance = self
         
-        self.db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgrespassword@localhost:5432/digital_twin")
+        self.db_url = config.get("db_url") or os.getenv("DATABASE_URL", "postgresql://postgres:postgrespassword@localhost:5432/digital_twin")
         self.assignments = config.get("assignments", {})
         self.domain = config.get("domain", "factory") 
+        self.table_name = config.get("table_name")
         self.poll_interval = float(config.get("poll_interval", 2.0))
         self.last_timestamps = {}  # Keep track of last seen row per component
 
-    def update_assignments(self, assignments: dict, domain: str):
+    def update_assignments(self, assignments: dict, domain: str, db_url: str = None, table_name: str = None):
         self.assignments = assignments
         self.domain = domain
+        if db_url:
+            self.db_url = db_url
+        if table_name:
+            self.table_name = table_name
         logger.info(f"PostgresConnector: updated for domain {domain} with {len(assignments)} KPIs")
 
     def get_table_name(self):
-        return f"{self.domain}_data"
+        return self.table_name or f"{self.domain}_data"
 
     def _get_connection(self):
         try:

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import useTwinStore, { DOMAINS } from '../store/useTwinStore';
 import { Play, Layers, Sparkles, Eye, Pencil, Trash2, Save, RefreshCw, AlertCircle, X, Share2, Copy } from 'lucide-react';
+import ConnectionWizard from '../components/ConnectionWizard';
 
 const DOMAIN_ICONS = { factory: '🏭', airport: '✈️', warehouse: '📦' };
 const DOMAIN_DESCS = {
@@ -264,6 +265,11 @@ export default function HomePage() {
                         <Layers size={18} /> View Live Demo
                     </button>
                 </div>
+            </div>
+
+            {/* Connection Wizard */}
+            <div style={{ padding: '48px 60px 0' }}>
+                <ConnectionWizard />
             </div>
 
             {/* Saved twins */}
