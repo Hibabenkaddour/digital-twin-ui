@@ -9,7 +9,7 @@ import os
 from datetime import datetime, timezone
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from simpleeval import simple_eval
+from simpleeval import simple_eval, NameNotDefined
 
 from connectors.base import BaseConnector, KpiReading
 
@@ -28,20 +28,26 @@ class PostgresConnector(BaseConnector):
         global _instance
         _instance = self
         
-        self.db_url = config.get("db_url") or os.getenv("DATABASE_URL", "postgresql://postgres:postgrespassword@localhost:5432/digital_twin")
+        self.db_url = config.get("db_url") or os.getenv("TELEMETRY_DB_URL", "postgresql://postgres:postgrespassword@localhost:5433/telemetry_db")
         self.assignments = config.get("assignments", {})
         self.domain = config.get("domain", "factory") 
         self.table_name = config.get("table_name")
+        self.timestamp_col = config.get("timestamp_col", "timestamp")
+        self.component_id_col = config.get("component_id_col", "component_id")
         self.poll_interval = float(config.get("poll_interval", 2.0))
         self.last_timestamps = {}  # Keep track of last seen row per component
 
-    def update_assignments(self, assignments: dict, domain: str, db_url: str = None, table_name: str = None):
+    def update_assignments(self, assignments: dict, domain: str, db_url: str = None, table_name: str = None, timestamp_col: str = None, component_id_col: str = None):
         self.assignments = assignments
         self.domain = domain
         if db_url:
             self.db_url = db_url
         if table_name:
             self.table_name = table_name
+        if timestamp_col:
+            self.timestamp_col = timestamp_col
+        if component_id_col:
+            self.component_id_col = component_id_col
         logger.info(f"PostgresConnector: updated for domain {domain} with {len(assignments)} KPIs")
 
     def get_table_name(self):
@@ -56,9 +62,13 @@ class PostgresConnector(BaseConnector):
 
     def _evaluate_formula(self, formula: str, row: dict) -> float:
         try:
-            # simple_eval securely evaluations math strings like "temp_engine + 5" substituting vars from row
             val = simple_eval(formula, names=row)
             return float(val)
+        except NameNotDefined as e:
+            # Column referenced in formula doesn't exist in this table — expected
+            # when a KPI belongs to a different domain/table than the current one.
+            logger.debug(f"Formula '{formula}' skipped — column not in row: {e}")
+            return 0.0
         except Exception as e:
             logger.warning(f"Formula evaluation failed for '{formula}': {e}")
             return 0.0
@@ -70,6 +80,7 @@ class PostgresConnector(BaseConnector):
         while self._running:
             await asyncio.sleep(self.poll_interval)
             
+            # logger.info(f"PostgresConnector: Polling with {len(self.assignments)} assignments")
             if not self.assignments:
                 continue
 
@@ -81,6 +92,7 @@ class PostgresConnector(BaseConnector):
                 continue
                 
             outage_logged = False
+            cursor = None  # always initialise so finally block is safe
 
             try:
                 cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -90,21 +102,22 @@ class PostgresConnector(BaseConnector):
                 components_needed = set(kpi.get('component_id') for kpi in self.assignments.values() if kpi.get('component_id'))
                 
                 for comp_id in components_needed:
-                    query = f"SELECT * FROM {table_name} WHERE component_id = %s"
+                    query = f"SELECT * FROM {table_name} WHERE {self.component_id_col} = %s"
                     params = [comp_id]
                     
                     last_ts = self.last_timestamps.get(comp_id)
                     if last_ts:
-                        query += " AND timestamp > %s"
+                        query += f" AND {self.timestamp_col} > %s"
                         params.append(last_ts)
                         
-                    query += " ORDER BY timestamp DESC LIMIT 1"
+                    query += f" ORDER BY {self.timestamp_col} DESC LIMIT 1"
                     
                     cursor.execute(query, tuple(params))
                     row = cursor.fetchone()
                     
                     if row:
-                        self.last_timestamps[comp_id] = row.get('timestamp')
+                        # logger.info(f"PostgresConnector: Found row for {comp_id}")
+                        self.last_timestamps[comp_id] = row.get(self.timestamp_col)
                         
                         # Process assigned KPIs for THIS specific component
                         comp_kpis = {k: v for k, v in self.assignments.items() if v.get('component_id') == comp_id}
@@ -115,7 +128,7 @@ class PostgresConnector(BaseConnector):
                             rules = kpi_config.get("rules", {})
                             status = self.compute_status(value, rules)
                             
-                            ts = row.get("timestamp") or datetime.now(timezone.utc)
+                            ts = row.get(self.timestamp_col) or datetime.now(timezone.utc)
                             if ts.tzinfo is None:
                                 ts = ts.replace(tzinfo=timezone.utc)
                                 
@@ -134,9 +147,11 @@ class PostgresConnector(BaseConnector):
                                 }
                             )
                             await self.emit(reading)
+                            logger.info(f"Emitted KPI {kpi_config.get('kpi_name')} = {value} for {comp_id}")
                             
             except Exception as e:
                 logger.error(f"PostgresConnector poll error: {e}")
             finally:
-                if cursor: cursor.close()
+                if cursor:
+                    cursor.close()
                 conn.close()

@@ -5,10 +5,11 @@ const STATUS_COLOR = { green: '#10d98d', orange: '#f59e0b', red: '#ef4444' };
 const STATUS_LABEL = { green: 'NORMAL', orange: 'WARNING', red: 'CRITICAL' };
 
 export default function KpiPanel() {
-  const { kpis, components, selectedComponentId, selectComponent, setStep } = useTwinStore();
+  const { kpis, kpiAssignments, components, selectedComponentId, selectComponent, setStep } = useTwinStore();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
 
+  const hasAssignments = kpiAssignments && kpiAssignments.length > 0;
 
   const selectedComp = components.find(c => c.id === selectedComponentId);
 
@@ -71,8 +72,19 @@ export default function KpiPanel() {
       {/* KPI list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
 
-        {/* Empty state */}
-        {kpis.length === 0 && (
+        {/* Empty state — waiting for live data (has assignments) */}
+        {kpis.length === 0 && hasAssignments && (
+          <div style={{ padding: '24px 12px', textAlign: 'center' }}>
+            <div style={{ fontSize: '28px', marginBottom: '8px', animation: 'pulse 1.5s infinite' }}>⏳</div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>Waiting for live data…</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-2)', lineHeight: 1.6, marginBottom: '12px' }}>
+              {kpiAssignments.length} KPI assignment{kpiAssignments.length !== 1 ? 's' : ''} configured. Connecting to the data stream…
+            </div>
+          </div>
+        )}
+
+        {/* Empty state — no assignments at all */}
+        {kpis.length === 0 && !hasAssignments && (
           <div style={{ padding: '24px 12px', textAlign: 'center' }}>
             <div style={{ fontSize: '28px', marginBottom: '8px' }}>📂</div>
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px' }}>No data source connected</div>

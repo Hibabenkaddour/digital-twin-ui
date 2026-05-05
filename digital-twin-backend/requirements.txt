@@ -14,7 +14,12 @@ langchain-community==0.3.13
 langgraph==0.2.60
 httpx==0.28.1
 aiosqlite==0.20.0
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.10
 simpleeval==0.9.13
 passlib==1.7.4
 bcrypt==4.1.2
+pymongo==4.6.1
+confluent-kafka
+cassandra-driver
+databricks-sql-connector
+paho-mqtt==1.6.1

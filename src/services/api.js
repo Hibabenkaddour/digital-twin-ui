@@ -59,10 +59,10 @@ export async function saveLayoutState(state) {
 
 // ─── Data Source API ─────────────────────────────────────────────────────────
 
-export async function connectTelemetryDb(dbUrl) {
+export async function connectTelemetryDb(sourceType, dbUrl, credentials = {}) {
     return apiFetch('/source/connect', {
         method: 'POST',
-        body: JSON.stringify({ db_url: dbUrl }),
+        body: JSON.stringify({ source_type: sourceType, db_url: dbUrl, credentials }),
     });
 }
 

@@ -38,7 +38,7 @@ const WS_LABELS = {
 
 export default function TwinView() {
     const {
-        kpis, components, connections,
+        kpis, kpiAssignments, components, connections,
         updateKpiValues, setStep,
         activePanel, setActivePanel,
         selectedComponentId, selectComponent,
@@ -258,11 +258,17 @@ export default function TwinView() {
                     {/* No data overlay */}
                     {kpis.length === 0 && (
                         <div style={{ position: 'absolute', bottom: '50px', left: '50%', transform: 'translateX(-50%)', padding: '10px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(72,101,242,0.3)', backdropFilter: 'blur(8px)', textAlign: 'center', pointerEvents: 'none' }}>
-                            {wsStatus === STATUS.CONNECTING || wsStatus === STATUS.RECONNECTING ? (
+                            {wsStatus === STATUS.CONNECTING || wsStatus === STATUS.RECONNECTING || (wsStatus === STATUS.LIVE && kpiAssignments.length > 0) ? (
                                 <>
                                     <div style={{ fontSize: '18px', marginBottom: '4px', animation: 'pulse 1.5s infinite' }}>⏳</div>
-                                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>Connecting to data stream...</div>
-                                    <div style={{ fontSize: '10px', color: 'var(--text-2)' }}>Waiting for real-time KPIs to arrive from the backend</div>
+                                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '2px' }}>
+                                        {wsStatus === STATUS.LIVE ? 'Waiting for live data…' : 'Connecting to data stream...'}
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: 'var(--text-2)' }}>
+                                        {kpiAssignments.length > 0
+                                            ? `${kpiAssignments.length} KPI assignment${kpiAssignments.length !== 1 ? 's' : ''} configured`
+                                            : 'Waiting for real-time KPIs to arrive from the backend'}
+                                    </div>
                                 </>
                             ) : (
                                 <>

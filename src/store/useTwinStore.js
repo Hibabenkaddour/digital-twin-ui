@@ -438,6 +438,12 @@ const useTwinStore = create((set, get) => ({
     updateKpiFromWS: (reading) => {
         // reading shape: { componentId, kpiName, value, unit, status, source, meta? }
         set(s => {
+            const comp = s.components.find(c => c.id === reading.componentId);
+            if (!comp) {
+                // FIX: Ignore KPI readings for components that don't belong to the active twin.
+                return s;
+            }
+
             const kpiId = `ws_${reading.componentId}_${reading.kpiName}`
                 .replace(/\s+/g, '_').replace(/[^a-z0-9_]/gi, '').toLowerCase();
 
@@ -479,8 +485,7 @@ const useTwinStore = create((set, get) => ({
                 newKpis = [...s.kpis, newKpi];
 
                 // Link KPI to its component
-                const comp = s.components.find(c => c.id === reading.componentId);
-                if (comp && !comp.kpiIds?.includes(kpiId)) {
+                if (!comp.kpiIds?.includes(kpiId)) {
                     newComponents = s.components.map(c =>
                         c.id === reading.componentId
                             ? { ...c, kpiIds: [...(c.kpiIds || []), kpiId] }

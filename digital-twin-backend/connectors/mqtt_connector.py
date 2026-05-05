@@ -34,23 +34,19 @@ MQTT_PASS     = os.getenv("MQTT_PASSWORD", "")
 
 
 class MqttConnector(BaseConnector):
-    """
-    Subscribes to MQTT broker, parses topic path into component+KPI identifiers,
-    and pushes readings to the KPI bus.
-    """
     name = "mqtt"
-    enabled = MQTT_ENABLED
 
     def __init__(self, config: dict):
         super().__init__(config)
+        self.broker = config.get("db_url", "localhost")
+        self.port = int(config.get("port", 1883))
+        self.topic_prefix = config.get("table_name", "dt/#")
+        self.username = config.get("username", "")
+        self.password = config.get("password", "")
         self._loop: asyncio.AbstractEventLoop | None = None
         self._client = None
 
     async def _run_loop(self):
-        if not MQTT_ENABLED:
-            logger.info("MQTT connector disabled (set MQTT_ENABLED=true to enable)")
-            return
-
         try:
             import paho.mqtt.client as mqtt
         except ImportError:
@@ -61,8 +57,8 @@ class MqttConnector(BaseConnector):
 
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
-                logger.info(f"✅ MQTT connected to {MQTT_BROKER}:{MQTT_PORT}")
-                client.subscribe(MQTT_PREFIX)
+                logger.info(f"✅ MQTT connected to {self.broker}:{self.port}")
+                client.subscribe(self.topic_prefix)
             else:
                 logger.error(f"MQTT connection failed: rc={rc}")
 
@@ -95,13 +91,13 @@ class MqttConnector(BaseConnector):
                 logger.error(f"MQTT message parse error: {e} — topic={msg.topic}")
 
         client = mqtt.Client()
-        if MQTT_USER:
-            client.username_pw_set(MQTT_USER, MQTT_PASS)
+        if self.username:
+            client.username_pw_set(self.username, self.password)
         client.on_connect = on_connect
         client.on_message = on_message
 
         try:
-            client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
+            client.connect(self.broker, self.port, keepalive=60)
             client.loop_start()
             self._client = client
             # Keep alive

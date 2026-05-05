@@ -1,5 +1,5 @@
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database — Métadonnées (twins, config)
   postgres:
     image: postgres:15
     container_name: digital_twin_db
@@ -13,7 +13,26 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d digital_twin"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d digital_twin" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # PostgreSQL Database — Télémétrie live
+  postgres_telemetry:
+    image: postgres:15
+    container_name: digital_twin_telemetry_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: telemetry_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata_telemetry:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d telemetry_db" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -39,9 +58,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      postgres_telemetry:
+        condition: service_healthy
     volumes:
       - ./source_data:/app/source_data
       - ./sample_data:/app/sample_data
 
 volumes:
   pgdata:
+  pgdata_telemetry:

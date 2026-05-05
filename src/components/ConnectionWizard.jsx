@@ -1,44 +1,41 @@
-/**
- * ConnectionWizard — unified single-source database setup panel.
- * Replaces the old per-component KPI import.
- *
- * Steps:
- *   1. Connect to PostgreSQL Database
- *   2. Discover tables & select one
- *   3. Assign each column to a component
- *   4. Save → WebSocket starts streaming real data to the plan
- */
 import { useState, useEffect } from 'react';
-import useTwinStore from '../store/useTwinStore';
-import { connectTelemetryDb, selectTelemetryTable, getTelemetrySchema, saveTelemetryAssignments, disconnectTelemetry, getTelemetryStatus } from '../services/api';
+import { connectTelemetryDb, selectTelemetryTable, getTelemetrySchema, getTelemetryStatus } from '../services/api';
+
+const SOURCE_TYPES = [
+  { id: 'postgres', label: 'PostgreSQL' },
+  { id: 'mongo', label: 'MongoDB' },
+  { id: 'cassandra', label: 'Cassandra' },
+  { id: 'databricks', label: 'Databricks' },
+  { id: 'kafka', label: 'Apache Kafka' },
+  { id: 'mqtt', label: 'MQTT Broker' },
+];
 
 export default function ConnectionWizard() {
-  const { components, selectedDomain } = useTwinStore();
-
-  const [step, setStep] = useState('connect');  // connect | assign | live
-  const [dbUrl, setDbUrl] = useState('postgresql://postgres:postgrespassword@localhost:5432/digital_twin');
+  const [sourceType, setSourceType] = useState('postgres');
+  const [dbUrl, setDbUrl] = useState('postgresql://postgres:postgrespassword@localhost:5433/telemetry_db');
+  const [credentials, setCredentials] = useState({ db_name: '', access_token: '', topic: '', port: '1883', username: '', password: '' });
+  
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState('');
+  const [columns, setColumns] = useState([]);
+  const [timestampCol, setTimestampCol] = useState('timestamp');
+  const [componentIdCol, setComponentIdCol] = useState('component_id');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [schema, setSchema] = useState(null);  // { columns, assignments, streaming }
-  const [assignments, setAssignments] = useState({});  // { colName: { component_id, kpi_name, unit, rules } }
+  const [success, setSuccess] = useState('');
   const [sourceStatus, setSourceStatus] = useState(null);
 
-  // Load current source status on mount
   useEffect(() => {
     getTelemetryStatus().then(s => {
       setSourceStatus(s);
       if (s.connected) {
         getTelemetrySchema().then(sch => {
-          setSchema(sch);
-          setAssignments(
-            Object.fromEntries(
-              Object.entries(sch.assignments || {}).map(([col, a]) => [col, a])
-            )
-          );
-          setStep(sch.streaming ? 'live' : 'assign');
+          setSelectedTable(sch.table || '');
+          setTimestampCol(sch.timestamp_col || 'timestamp');
+          setComponentIdCol(sch.component_id_col || 'component_id');
+          setColumns(sch.columns || []);
+          setSuccess(`Currently connected to table/topic: ${sch.table}`);
         });
       }
     }).catch(() => {});
@@ -46,10 +43,16 @@ export default function ConnectionWizard() {
 
   const handleConnect = async () => {
     if (!dbUrl) return;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setSuccess('');
     try {
-      const data = await connectTelemetryDb(dbUrl);
+      const data = await connectTelemetryDb(sourceType, dbUrl, credentials);
       setTables(data.tables || []);
+      setSuccess('Connected to data source. Please select a table/collection/topic.');
+      
+      // Auto-select if only 1 topic
+      if ((sourceType === 'kafka' || sourceType === 'mqtt') && data.tables?.length === 1) {
+          handleSelectTable(data.tables[0]);
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -59,44 +62,25 @@ export default function ConnectionWizard() {
 
   const handleSelectTable = async (t) => {
     if (!t) return;
-    setLoading(true); setError('');
+    setSelectedTable(t);
+    setLoading(true);
     try {
-      await selectTelemetryTable(t);
-      setSelectedTable(t);
+      await selectTelemetryTable(t, timestampCol, componentIdCol);
       const sch = await getTelemetrySchema();
-      setSchema(sch);
-      
-      const init = {};
-      sch.columns.forEach(col => { init[col] = { component_id: '', kpi_name: formatColName(col), unit: guessUnit(col), rules: {} }; });
-      setAssignments(init);
-      
-      setStep('assign');
+      setColumns(sch.columns || []);
     } catch (e) {
-      setError(e.message);
+      setError('Failed to fetch schema for mapping: ' + e.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async () => {
-    setLoading(true); setError('');
+  const handleSaveConnection = async () => {
+    if (!selectedTable) return;
+    setLoading(true); setError(''); setSuccess('');
     try {
-      const assigned = Object.entries(assignments)
-        .filter(([_, a]) => a.component_id && a.kpi_name)
-        .map(([col, a]) => ({
-          kpi_id: col, // Using column name as kpi_id for DB streaming
-          component_id: a.component_id,
-          kpi_name: a.kpi_name,
-          formula: col, // The formula is just the column name to extract it
-          unit: a.unit || '',
-          rules: a.rules || {},
-          interaction: 'pulse'
-        }));
-
-      if (assigned.length === 0) { setError('Please assign at least one column to a component.'); setLoading(false); return; }
-
-      await saveTelemetryAssignments(selectedDomain, assigned);
-      setStep('live');
+      await selectTelemetryTable(selectedTable, timestampCol, componentIdCol);
+      setSuccess(`Configuration saved! Telemetry will be streamed from: ${selectedTable}. You can now proceed to create a Twin and map these columns.`);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -104,213 +88,189 @@ export default function ConnectionWizard() {
     }
   };
 
-  const handleDisconnect = async () => {
-    await disconnectTelemetry();
-    setStep('connect'); setSchema(null); setAssignments({}); setTables([]); setSelectedTable('');
+  // Switch default URL when changing source type
+  const handleTypeChange = (e) => {
+    const t = e.target.value;
+    setSourceType(t);
+    setTables([]);
+    setSelectedTable('');
+    if (t === 'postgres') setDbUrl('postgresql://postgres:postgrespassword@localhost:5433/telemetry_db');
+    if (t === 'mongo') setDbUrl('mongodb://localhost:27017/');
+    if (t === 'cassandra') setDbUrl('127.0.0.1');
+    if (t === 'databricks') setDbUrl('dbc-xxxxx.cloud.databricks.com');
+    if (t === 'kafka') setDbUrl('localhost:9092');
+    if (t === 'mqtt') setDbUrl('localhost');
   };
-
-  const assignedCount = Object.values(assignments).filter(a => a.component_id && a.kpi_name).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-1)', overflow: 'hidden', border: '1px solid var(--border)', borderRadius: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-0)', marginBottom: '4px' }}>
-          🔌 Connection Wizard
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-0)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          🔌 Global Telemetry Connection
         </div>
-        {/* Step indicators */}
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          {[['connect','1 Connect'],['assign','2 Assign'],['live','3 Live']].map(([s, label]) => (
-            <span key={s} style={{ fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '10px', transition: 'all 0.15s',
-              background: step === s ? 'rgba(72,101,242,0.2)' : 'transparent',
-              color: step === s ? 'var(--accent)' : 'var(--text-2)',
-              border: `1px solid ${step === s ? 'rgba(72,101,242,0.4)' : 'transparent'}` }}>
-              {label}
-            </span>
-          ))}
+        <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '4px' }}>
+          Connect the platform to your telemetry database or stream. Assignment and live visualization will be configured during the Twin creation.
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+      <div style={{ padding: '16px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          
+          {/* Source Type */}
+          <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px', display: 'block' }}>Source Type</label>
+          <select 
+            value={sourceType}
+            onChange={handleTypeChange}
+            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '12px', marginBottom: '12px' }}
+          >
+            {SOURCE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
 
-        {/* STEP 1: Connect */}
-        {step === 'connect' && (
-          <>
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '4px' }}>Database Connection</div>
-              <div style={{ fontSize: '10px', color: 'var(--text-2)', marginBottom: '12px' }}>Enter your PostgreSQL database URL to connect to the telemetry source.</div>
-              
+          {/* Dynamic DB URL */}
+          <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px', display: 'block' }}>
+            {sourceType === 'postgres' ? 'Database URL' : 
+             sourceType === 'mongo' ? 'Connection String (URI)' : 
+             sourceType === 'cassandra' ? 'Contact Points (comma separated)' : 
+             sourceType === 'databricks' ? 'Server Hostname' : 
+             sourceType === 'kafka' ? 'Bootstrap Servers' : 'Broker Host'}
+          </label>
+          <input 
+            type="text" 
+            value={dbUrl} 
+            onChange={e => setDbUrl(e.target.value)}
+            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '12px', marginBottom: '12px', boxSizing: 'border-box' }}
+          />
+
+          {/* Dynamic Credentials / Extra Config */}
+          {(sourceType === 'mongo' || sourceType === 'cassandra' || sourceType === 'databricks') && (
+            <>
+              <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px', display: 'block' }}>
+                {sourceType === 'databricks' ? 'HTTP Path' : sourceType === 'cassandra' ? 'Keyspace' : 'Database Name'}
+              </label>
               <input 
                 type="text" 
-                value={dbUrl} 
-                onChange={e => setDbUrl(e.target.value)}
-                placeholder="postgresql://user:password@localhost:5432/dbname"
+                value={credentials.db_name} 
+                onChange={e => setCredentials({...credentials, db_name: e.target.value})}
                 style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '12px', marginBottom: '12px', boxSizing: 'border-box' }}
               />
-              
-              <button onClick={handleConnect} disabled={!dbUrl || loading}
-                style={{ width: '100%', padding: '10px', borderRadius: '10px', background: dbUrl ? 'linear-gradient(135deg,#4865f2,#f4723e)' : 'var(--bg-0)', border: 'none', color: dbUrl ? '#fff' : 'var(--text-2)', fontSize: '12px', fontWeight: 700, cursor: dbUrl ? 'pointer' : 'not-allowed', marginBottom: '16px' }}>
-                {loading ? '⏳ Connecting...' : '🔌 Test Connection & Fetch Tables'}
-              </button>
-            </div>
+            </>
+          )}
 
-            {tables.length > 0 && (
-              <div style={{ padding: '12px', background: 'rgba(16,217,141,0.05)', border: '1px solid rgba(16,217,141,0.2)', borderRadius: '8px', marginBottom: '12px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#10d98d', marginBottom: '8px' }}>✅ Connected successfully!</div>
-                <div style={{ fontSize: '10px', color: 'var(--text-2)', marginBottom: '6px' }}>Select a table to start mapping columns:</div>
-                <select 
-                  onChange={e => handleSelectTable(e.target.value)}
-                  defaultValue=""
-                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '11px' }}
-                >
-                  <option value="" disabled>-- Select a table --</option>
-                  {tables.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-            )}
+          {sourceType === 'databricks' && (
+            <>
+              <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px', display: 'block' }}>Access Token</label>
+              <input 
+                type="password" 
+                value={credentials.access_token} 
+                onChange={e => setCredentials({...credentials, access_token: e.target.value})}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '12px', marginBottom: '12px', boxSizing: 'border-box' }}
+              />
+            </>
+          )}
 
-            {error && <div style={{ fontSize: '11px', color: '#ef4444', padding: '6px 10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px' }}>{error}</div>}
-          </>
-        )}
+          {(sourceType === 'kafka' || sourceType === 'mqtt') && (
+            <>
+              <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px', display: 'block' }}>
+                {sourceType === 'mqtt' ? 'Topic Prefix (e.g. dt/#)' : 'Topic Name'}
+              </label>
+              <input 
+                type="text" 
+                value={credentials.topic} 
+                onChange={e => setCredentials({...credentials, topic: e.target.value})}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '12px', marginBottom: '12px', boxSizing: 'border-box' }}
+              />
+            </>
+          )}
 
-        {/* STEP 2: Column Assignment */}
-        {step === 'assign' && schema && (
-          <>
-            <div style={{ padding: '8px 10px', borderRadius: '8px', background: 'rgba(16,217,141,0.07)', border: '1px solid rgba(16,217,141,0.2)', marginBottom: '12px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#10d98d' }}>
-                ✅ Table: {schema.table} — {schema.columns?.length} columns found
-              </div>
-            </div>
-
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '8px' }}>
-              Assign columns to components:
-            </div>
-
-            {schema.columns?.map(col => {
-              const a = assignments[col] || {};
-              return (
-                <div key={col} style={{ marginBottom: '10px', padding: '10px', borderRadius: '8px', background: 'var(--bg-0)', border: `1px solid ${a.component_id ? 'rgba(72,101,242,0.3)' : 'var(--border)'}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', fontFamily: 'monospace' }}>{col}</div>
-                    {a.component_id && <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '8px', background: 'rgba(72,101,242,0.15)', color: 'var(--accent)', border: '1px solid rgba(72,101,242,0.3)' }}>✓ assigned</span>}
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '6px' }}>
-                    <div>
-                      <label style={{ fontSize: '9px', color: 'var(--text-2)', display: 'block', marginBottom: '2px' }}>Component</label>
-                      <select value={a.component_id || ''} onChange={e => setAssignments(prev => ({ ...prev, [col]: { ...prev[col], component_id: e.target.value } }))}
-                        style={{ width: '100%', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px', color: 'var(--text-0)', fontSize: '10px' }}>
-                        <option value="">— not assigned —</option>
-                        {components.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '9px', color: 'var(--text-2)', display: 'block', marginBottom: '2px' }}>KPI Name</label>
-                      <input value={a.kpi_name || ''} onChange={e => setAssignments(prev => ({ ...prev, [col]: { ...prev[col], kpi_name: e.target.value } }))}
-                        placeholder="e.g. Temperature"
-                        style={{ width: '100%', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px', color: 'var(--text-0)', fontSize: '10px', outline: 'none', boxSizing: 'border-box' }} />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 1fr 1fr', gap: '5px' }}>
-                    <div>
-                      <label style={{ fontSize: '9px', color: 'var(--text-2)', display: 'block', marginBottom: '2px' }}>Unit</label>
-                      <input value={a.unit || ''} onChange={e => setAssignments(prev => ({ ...prev, [col]: { ...prev[col], unit: e.target.value } }))}
-                        placeholder="°C"
-                        style={{ width: '100%', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px', color: 'var(--text-0)', fontSize: '10px', outline: 'none', boxSizing: 'border-box' }} />
-                    </div>
-                    {[['🟡 Warn ≥', 'orange'], ['🔴 Critical ≥', 'red']].map(([label, key]) => (
-                      <div key={key}>
-                        <label style={{ fontSize: '9px', color: 'var(--text-2)', display: 'block', marginBottom: '2px' }}>{label}</label>
-                        <input type="number" value={a.rules?.[key]?.[0] || ''}
-                          onChange={e => {
-                            const val = parseFloat(e.target.value);
-                            const max = key === 'orange' ? (a.rules?.red?.[0] || 9999) : 9999;
-                            setAssignments(prev => ({ ...prev, [col]: { ...prev[col], rules: { ...prev[col]?.rules, [key]: [val, max] } } }));
-                          }}
-                          placeholder="—"
-                          style={{ width: '100%', background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px', color: 'var(--text-0)', fontSize: '10px', outline: 'none', boxSizing: 'border-box' }} />
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                      <button onClick={() => setAssignments(prev => ({ ...prev, [col]: { ...prev[col], component_id: '', kpi_name: '', unit: '', rules: {} } }))}
-                        style={{ width: '100%', padding: '5px', borderRadius: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '10px', cursor: 'pointer' }}>
-                        Clear
-                      </button>
-                    </div>
-                  </div>
+          {sourceType === 'mqtt' && (
+            <>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px', display: 'block' }}>Port</label>
+                  <input type="text" value={credentials.port} onChange={e => setCredentials({...credentials, port: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '12px', marginBottom: '12px', boxSizing: 'border-box' }} />
                 </div>
-              );
-            })}
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px', display: 'block' }}>Username</label>
+                  <input type="text" value={credentials.username} onChange={e => setCredentials({...credentials, username: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '12px', marginBottom: '12px', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+            </>
+          )}
 
-            {error && <div style={{ fontSize: '11px', color: '#ef4444', marginBottom: '10px', padding: '6px 10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px' }}>{error}</div>}
-          </>
-        )}
-
-        {/* STEP 3: Live streaming */}
-        {step === 'live' && (
-          <div style={{ textAlign: 'center', padding: '16px 0' }}>
-            <div style={{ fontSize: '36px', marginBottom: '10px' }}>📡</div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#10d98d', marginBottom: '6px' }}>Streaming Live Data</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-2)', marginBottom: '16px' }}>
-              {assignedCount} KPI column{assignedCount !== 1 ? 's' : ''} streaming to your digital twin via WebSocket.<br/>
-              Values update automatically in the KPI panel.
-            </div>
-            <div style={{ textAlign: 'left', marginBottom: '14px' }}>
-              {Object.entries(assignments).filter(([_, a]) => a.component_id).map(([col, a]) => {
-                const comp = components.find(c => c.id === a.component_id);
-                return (
-                  <div key={col} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', marginBottom: '4px', borderRadius: '7px', background: 'var(--bg-0)', border: '1px solid var(--border)', fontSize: '10px' }}>
-                    <span style={{ color: 'var(--accent)', fontFamily: 'monospace' }}>{col}</span>
-                    <span style={{ color: 'var(--text-2)' }}>→</span>
-                    <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{comp?.name || a.component_id}</span>
-                    <span style={{ color: '#10d98d' }}>● {a.kpi_name} {a.unit && `(${a.unit})`}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setStep('assign')}
-                style={{ flex: 1, padding: '9px', borderRadius: '8px', background: 'var(--bg-0)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '11px', cursor: 'pointer' }}>
-                ✏️ Edit Assignments
-              </button>
-              <button onClick={handleDisconnect}
-                style={{ flex: 1, padding: '9px', borderRadius: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', fontSize: '11px', cursor: 'pointer' }}>
-                🔌 Disconnect
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom action bar */}
-      {(step === 'assign') && (
-        <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', gap: '8px' }}>
-          <button onClick={() => setStep('connect')}
-            style={{ padding: '8px 14px', borderRadius: '8px', background: 'var(--bg-0)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '11px', cursor: 'pointer' }}>
-            ← Back
-          </button>
-          <button onClick={handleSave} disabled={assignedCount === 0 || loading}
-            style={{ flex: 1, padding: '8px', borderRadius: '8px', background: assignedCount > 0 ? 'linear-gradient(135deg,#4865f2,#f4723e)' : 'var(--bg-0)', border: 'none', color: assignedCount > 0 ? '#fff' : 'var(--text-2)', fontSize: '12px', fontWeight: 700, cursor: assignedCount > 0 ? 'pointer' : 'not-allowed' }}>
-            {loading ? '⏳ Saving…' : `▶ Start Streaming (${assignedCount} columns)`}
+          <button onClick={handleConnect} disabled={!dbUrl || loading}
+            style={{ width: '100%', padding: '10px', borderRadius: '10px', background: dbUrl ? 'linear-gradient(135deg,#4865f2,#f4723e)' : 'var(--bg-0)', border: 'none', color: dbUrl ? '#fff' : 'var(--text-2)', fontSize: '12px', fontWeight: 700, cursor: dbUrl ? 'pointer' : 'not-allowed' }}>
+            {loading ? '⏳ Connecting...' : 'Test Connection & Fetch Schemas'}
           </button>
         </div>
-      )}
+
+        {tables.length > 0 ? (
+          <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-0)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '6px', display: 'block' }}>
+              Select {sourceType === 'mongo' ? 'Collection' : sourceType === 'kafka' || sourceType === 'mqtt' ? 'Topic' : 'Table'}
+            </label>
+            <select 
+              value={selectedTable}
+              onChange={e => handleSelectTable(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-1)', color: 'var(--text-0)', fontSize: '12px', marginBottom: '12px' }}
+            >
+              <option value="" disabled>-- Select --</option>
+              {tables.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+
+            {selectedTable && (
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', marginBottom: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}>Schema Mapping (Normalization)</div>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '10px', color: 'var(--text-2)', marginBottom: '4px', display: 'block' }}>Component/Sensor ID Field</label>
+                    {columns.length > 0 ? (
+                      <select 
+                        value={componentIdCol}
+                        onChange={e => setComponentIdCol(e.target.value)}
+                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '11px' }}
+                      >
+                        <option value="component_id">Default (component_id)</option>
+                        {columns.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" value={componentIdCol} onChange={e => setComponentIdCol(e.target.value)} placeholder="e.g. sensor_id" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '11px', boxSizing: 'border-box' }} />
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '10px', color: 'var(--text-2)', marginBottom: '4px', display: 'block' }}>Timestamp Field</label>
+                    {columns.length > 0 ? (
+                      <select 
+                        value={timestampCol}
+                        onChange={e => setTimestampCol(e.target.value)}
+                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '11px' }}
+                      >
+                        <option value="timestamp">Default (timestamp)</option>
+                        {columns.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" value={timestampCol} onChange={e => setTimestampCol(e.target.value)} placeholder="e.g. created_at" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-0)', fontSize: '11px', boxSizing: 'border-box' }} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <button onClick={handleSaveConnection} disabled={!selectedTable || loading}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: selectedTable ? '#10d98d' : 'var(--bg-1)', border: 'none', color: selectedTable ? '#fff' : 'var(--text-2)', fontSize: '12px', fontWeight: 700, cursor: selectedTable ? 'pointer' : 'not-allowed' }}>
+              {loading ? '⏳ Saving...' : 'Save Configuration'}
+            </button>
+          </div>
+        ) : success && tables.length === 0 && !loading && sourceType === 'postgres' ? (
+          <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(245,158,11,0.08)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', fontSize: '11px' }}>
+            <strong style={{ display: 'block', marginBottom: '4px' }}>⚠️ No tables found in this database</strong>
+            The database is currently empty. Please make sure you have restarted the <code>generate_pg_data.py</code> script so it can create the telemetry tables.
+          </div>
+        ) : null}
+
+        {error && <div style={{ fontSize: '11px', color: '#ef4444', padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>{error}</div>}
+        {success && <div style={{ fontSize: '11px', color: '#10d98d', padding: '10px', background: 'rgba(16,217,141,0.08)', borderRadius: '8px', border: '1px solid rgba(16,217,141,0.2)' }}>{success}</div>}
+      </div>
     </div>
   );
-}
-
-function formatColName(col) {
-  return col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/ Pct$/, ' %').replace(/ C$/, ' °C').replace(/ H$/, '/h');
-}
-
-function guessUnit(col) {
-  const l = col.toLowerCase();
-  if (l.includes('_c')) return '°C';
-  if (l.includes('_pct') || l.includes('_rate')) return '%';
-  if (l.includes('_h') || l.includes('_per_h')) return '/h';
-  if (l.includes('_min')) return 'min';
-  if (l.includes('bar')) return 'bar';
-  if (l.includes('persons') || l.includes('queue')) return 'persons';
-  return '';
 }

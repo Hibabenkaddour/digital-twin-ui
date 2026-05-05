@@ -63,15 +63,18 @@ async def _start_connectors():
     from connectors.postgres_connector import PostgresConnector
     from connectors.mqtt_connector import MqttConnector, MQTT_ENABLED
     from connectors.rest_connector import RestConnector, REST_ENABLED
-    from routers.data_source import get_source_state
+    from routers.data_source import get_source_state, register_active_connector
 
     state = get_source_state()
 
     # Postgres connector — primary source
     saved_assignments = state.get("assignments", {})
     domain = state.get("domain", "factory")
-    telemetry_db_url = state.get("telemetry_db_url")
-    telemetry_table = state.get("telemetry_table")
+    telemetry_db_url = state.get("telemetry_db_url") or os.getenv(
+        "TELEMETRY_DB_URL",
+        "postgresql://postgres:postgrespassword@localhost:5433/telemetry_db",
+    )
+    telemetry_table = state.get("telemetry_table") or f"{domain}_data"
 
     pc = PostgresConnector({
         "assignments": saved_assignments,
@@ -81,8 +84,10 @@ async def _start_connectors():
         "poll_interval": 2.0,
     })
     _connectors.append(pc)
+    # Register as the active connector so /source/assign can properly replace it
+    register_active_connector(pc)
     await pc.start()
-    logger.info(f"🐘 Postgres connector started — polling domain '{domain}'")
+    logger.info(f"🐘 Postgres connector started — domain='{domain}', table='{telemetry_table}', assignments={len(saved_assignments)}")
 
     # MQTT (optional, for real IoT sensors)
     if MQTT_ENABLED:
@@ -171,5 +176,6 @@ if __name__ == "__main__":
         host=os.getenv("HOST", "0.0.0.0"),
         port=int(os.getenv("PORT", 8000)),
         reload=os.getenv("DEBUG", "true").lower() == "true",
+        reload_excludes=["source_data/*", "*.json", "__pycache__/*", "venv/*"],
     )
 
