@@ -10,8 +10,11 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import useTwinStore from '../store/useTwinStore';
+import { 
+  getTelemetryStatus, getTelemetrySchema, uploadTelemetryFile, 
+  saveTelemetryAssignments, disconnectTelemetry 
+} from '../services/api';
 
-const BASE_URL = '';  // uses Vite proxy
 
 export default function DataSourcePanel() {
   const { components, selectedDomain } = useTwinStore();
@@ -29,10 +32,10 @@ export default function DataSourcePanel() {
 
   // Load current source status on mount
   useEffect(() => {
-    fetch(`${BASE_URL}/source/status`).then(r => r.json()).then(s => {
+    getTelemetryStatus().then(s => {
       setSourceStatus(s);
       if (s.connected) {
-        fetch(`${BASE_URL}/source/schema`).then(r => r.json()).then(schema => {
+        getTelemetrySchema().then(schema => {
           setSchema(schema);
           setAssignments(
             Object.fromEntries(
@@ -56,11 +59,7 @@ export default function DataSourcePanel() {
     if (!file) return;
     setLoading(true); setError('');
     try {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch(`${BASE_URL}/source/upload`, { method: 'POST', body: form });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
-      const data = await res.json();
+      const data = await uploadTelemetryFile(file);
       setSchema(data);
       // Pre-fill assignments with empty values for all columns
       const init = {};
@@ -90,12 +89,7 @@ export default function DataSourcePanel() {
 
       if (assigned.length === 0) { setError('Please assign at least one column to a component.'); setLoading(false); return; }
 
-      const res = await fetch(`${BASE_URL}/source/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignments: assigned }),
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+      await saveTelemetryAssignments(selectedDomain, assigned);
       setSaved(true);
       setStep('live');
     } catch (e) {
@@ -106,7 +100,7 @@ export default function DataSourcePanel() {
   };
 
   const handleDisconnect = async () => {
-    await fetch(`${BASE_URL}/source`, { method: 'DELETE' });
+    await disconnectTelemetry();
     setStep('upload'); setSchema(null); setAssignments({}); setFile(null); setSaved(false);
   };
 

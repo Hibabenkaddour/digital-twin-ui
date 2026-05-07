@@ -2,19 +2,46 @@
  * API Client — typed service for all backend calls.
  * Uses Vite dev proxy (see vite.config.js) — no CORS issues.
  * In production, set VITE_API_URL env var to backend URL.
+ *
+ * Auth: automatically refreshes the Keycloak token before each request
+ * and injects the Bearer header. No manual token management needed.
  */
+
+import keycloak from './keycloak';
+import useTwinStore from '../store/useTwinStore';
 
 const BASE_URL = import.meta.env.VITE_API_URL || '';
 
-async function apiFetch(path, options = {}) {
+export async function apiFetch(path, options = {}) {
+    // Refresh token if it expires within the next 30 seconds
+    try {
+        // Only attempt refresh if keycloak is properly initialized and authenticated
+        if (keycloak && keycloak.authenticated && keycloak.token) {
+            await keycloak.updateToken(30).catch(err => {
+                console.warn('Token refresh silent failure:', err);
+            });
+            // Sync store with whatever token we have now
+            useTwinStore.getState().setAuth(keycloak.token, keycloak.tokenParsed);
+        }
+    } catch (e) {
+        console.error('Keycloak updateToken critical error:', e);
+    }
+
+    const token = keycloak?.token || useTwinStore.getState().token;
+
+    const headers = new Headers(options.headers || {});
+    if (!(options.body instanceof FormData) && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+    }
+    if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+    }
+
     const res = await fetch(`${BASE_URL}${path}`, {
         ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            ...(options.headers || {}),
-        },
+        headers,
     });
-    
+
     if (!res.ok) {
         let errStr = `Erreur ${res.status} ${res.statusText}`;
         try {
@@ -26,12 +53,12 @@ async function apiFetch(path, options = {}) {
         } catch (e) {}
         throw new Error(errStr);
     }
-    
+
     const txt = await res.text();
     try {
         return txt ? JSON.parse(txt) : {};
-    } catch(e) {
-        throw new Error("Invalid JSON de l'API: " + txt.substring(0, 50));
+    } catch (e) {
+        throw new Error('Invalid JSON from API: ' + txt.substring(0, 50));
     }
 }
 
@@ -75,6 +102,15 @@ export async function selectTelemetryTable(tableName) {
 
 export async function getTelemetrySchema() {
     return apiFetch('/source/schema');
+}
+
+export async function uploadTelemetryFile(file) {
+    const form = new FormData();
+    form.append('file', file);
+    return apiFetch('/source/upload', {
+        method: 'POST',
+        body: form,
+    });
 }
 
 export async function saveTelemetryAssignments(domain, assignments) {
@@ -185,10 +221,19 @@ export async function deleteShareLink(shareId) {
 }
 
 export async function verifyShareLink(shareId, password) {
-    return apiFetch(`/share/${shareId}/verify`, {
+    // NOTE: This call does NOT go through apiFetch because it's intentionally
+    // unauthenticated — the shared viewer may not have a Keycloak account.
+    const BASE = import.meta.env.VITE_API_URL || '';
+    const res = await fetch(`${BASE}/share/${shareId}/verify`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
     });
+    if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.detail || `Error ${res.status}`);
+    }
+    return res.json();
 }
 
 // ─── Health check ─────────────────────────────────────────────────────────────

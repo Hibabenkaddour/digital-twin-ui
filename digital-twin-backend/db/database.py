@@ -1,11 +1,13 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./digital_twin.db")
 
@@ -23,6 +25,7 @@ class LayoutStateDB(Base):
     __tablename__ = "layout_states"
 
     id = Column(String, primary_key=True, default="default")
+    user_id = Column(String, nullable=True, index=True)  # Keycloak sub claim
     name = Column(String, default="Digital Twin")
     domain = Column(String, default="factory")
     width = Column(Float, default=60.0)
@@ -62,14 +65,49 @@ class ShareLinkDB(Base):
     __tablename__ = "share_links"
 
     id = Column(String, primary_key=True)
+    user_id = Column(String, nullable=True, index=True)  # Keycloak sub claim — owner
     twin_id = Column(String, nullable=False, index=True)
     name = Column(String, nullable=False)
     password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+def _run_migrations(conn):
+    """
+    Safe ALTER TABLE migrations — adds new columns to existing tables without
+    dropping data. PostgreSQL supports 'ADD COLUMN IF NOT EXISTS'; for SQLite
+    we catch the OperationalError if the column already exists.
+    """
+    is_postgres = "postgresql" in DATABASE_URL or "postgres" in DATABASE_URL
+
+    migrations = [
+        ("layout_states",  "user_id", "VARCHAR"),
+        ("share_links",    "user_id", "VARCHAR"),
+    ]
+
+    for table, column, col_type in migrations:
+        try:
+            if is_postgres:
+                conn.execute(text(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {col_type};"
+                ))
+            else:
+                conn.execute(text(
+                    f"ALTER TABLE {table} ADD COLUMN {column} {col_type};"
+                ))
+            logger.info(f"Migration OK: {table}.{column}")
+        except Exception as e:
+            # Column already exists in SQLite — harmless
+            if "duplicate column" in str(e).lower() or "already exists" in str(e).lower():
+                logger.debug(f"Migration skip (already exists): {table}.{column}")
+            else:
+                logger.error(f"Migration error on {table}.{column}: {e}")
+
+
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        _run_migrations(conn)
 
 
 def get_db():

@@ -25,7 +25,7 @@ const WS_LABELS = {
 
 export default function SharedTwinView({ shareId }) {
     const {
-        loadTwinFromDb, kpis, components, connections,
+        kpis, components, connections,
         updateKpiValues, activePanel, setActivePanel,
         selectedComponentId, selectComponent,
         twinName, selectedDomain
@@ -47,17 +47,26 @@ export default function SharedTwinView({ shareId }) {
         }
     }, [shareId]);
 
-    const handleLoadTwin = async (twinId) => {
-        setLoading(true);
-        try {
-            await loadTwinFromDb(twinId, 5); // 5 is TwinView step
-            setIsAuthenticated(true);
-        } catch (e) {
-            setError('Failed to load twin data. The link might be invalid or the twin was deleted.');
-            sessionStorage.removeItem(`share_pw_${shareId}`);
-        } finally {
-            setLoading(false);
-        }
+    const handleLoadTwinData = (twinData) => {
+        // Load twin state directly from the verify response — no authenticated API call needed
+        const cellSize = 6;
+        useTwinStore.setState({
+            activeTwinId: twinData.id,
+            twinName: twinData.name,
+            selectedDomain: twinData.domain,
+            width: twinData.width || 60,
+            length: twinData.length || 40,
+            gridCols: twinData.gridCols || 10,
+            gridRows: twinData.gridRows || 8,
+            cellSize,
+            components: twinData.components || [],
+            connections: twinData.connections || [],
+            kpis: [],
+            kpiAssignments: twinData.kpiAssignments || [],
+            kpiHistory: [],
+            currentStep: 5,
+        });
+        setIsAuthenticated(true);
     };
 
     const handleLogin = async (e, forcePassword) => {
@@ -67,9 +76,9 @@ export default function SharedTwinView({ shareId }) {
         setError(null);
         try {
             const res = await verifyShareLink(shareId, pwToUse);
-            if (res && res.success && res.twin_id) {
+            if (res && res.success && res.twin_data) {
                 sessionStorage.setItem(`share_pw_${shareId}`, pwToUse);
-                await handleLoadTwin(res.twin_id);
+                handleLoadTwinData(res.twin_data);
             }
         } catch (e) {
             setError(e.message || 'Incorrect password');

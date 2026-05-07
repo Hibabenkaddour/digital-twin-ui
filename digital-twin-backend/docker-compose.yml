@@ -37,32 +37,27 @@ services:
       timeout: 5s
       retries: 10
 
-  # FastAPI Backend
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      network: host
-    container_name: digital_twin_backend
+  # Keycloak IAM — Auth server for multi-tenant login
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.4
+    container_name: digital_twin_keycloak
     restart: unless-stopped
-    env_file:
-      - .env
+    command: start-dev
     environment:
-      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/digital_twin
-      HOST: 0.0.0.0
-      PORT: 8000
-      DEBUG: "false"
-      FRONTEND_URL: http://localhost:5173
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_DATABASE: digital_twin
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgrespassword
     ports:
-      - "8000:8000"
+      - "8080:8080"
+    volumes:
+      - ./keycloak-theme:/opt/keycloak/themes
     depends_on:
       postgres:
         condition: service_healthy
-      postgres_telemetry:
-        condition: service_healthy
-    volumes:
-      - ./source_data:/app/source_data
-      - ./sample_data:/app/sample_data
 
 volumes:
   pgdata:

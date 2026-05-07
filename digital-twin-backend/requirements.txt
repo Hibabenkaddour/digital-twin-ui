@@ -23,3 +23,5 @@ confluent-kafka
 cassandra-driver
 databricks-sql-connector
 paho-mqtt==1.6.1
+PyJWT==2.8.0
+cryptography==42.0.5

@@ -164,6 +164,18 @@ let compIdCounter = 100;
 const useTwinStore = create((set, get) => ({
     threeSceneRef: null,
 
+    // ── Auth state (populated by Keycloak in main.jsx) ─────────────────────
+    token: null,
+    user: null,
+    isAuthenticated: false,
+    setAuth: (token, tokenParsed) => set({
+        token,
+        user: tokenParsed,
+        isAuthenticated: !!token,
+    }),
+    logout: () => set({ token: null, user: null, isAuthenticated: false }),
+    // ──────────────────────────────────────────────────────────────────────
+
     currentStep: 0,
     selectedDomain: null,
     twinName: '',

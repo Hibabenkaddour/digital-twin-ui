@@ -7,21 +7,28 @@ from models.schemas import LayoutStateSchema, KpiRecord
 
 # ─── Layout CRUD ──────────────────────────────────────────────────────────────
 
-def get_layout(db: Session, layout_id: str = "default") -> LayoutStateDB | None:
-    return db.query(LayoutStateDB).filter(LayoutStateDB.id == layout_id).first()
+def get_layout(db: Session, layout_id: str = "default", user_id: str = None) -> LayoutStateDB | None:
+    query = db.query(LayoutStateDB).filter(LayoutStateDB.id == layout_id)
+    if user_id:
+        query = query.filter(LayoutStateDB.user_id == user_id)
+    return query.first()
 
 
-def list_twins(db: Session) -> list[LayoutStateDB]:
-    return (
+def list_twins(db: Session, user_id: str = None) -> list[LayoutStateDB]:
+    query = (
         db.query(LayoutStateDB)
         .filter(LayoutStateDB.id != "default")
-        .order_by(LayoutStateDB.updated_at.desc())
-        .all()
     )
+    if user_id:
+        query = query.filter(LayoutStateDB.user_id == user_id)
+    return query.order_by(LayoutStateDB.updated_at.desc()).all()
 
 
-def delete_twin(db: Session, twin_id: str) -> bool:
-    twin = db.query(LayoutStateDB).filter(LayoutStateDB.id == twin_id).first()
+def delete_twin(db: Session, twin_id: str, user_id: str = None) -> bool:
+    query = db.query(LayoutStateDB).filter(LayoutStateDB.id == twin_id)
+    if user_id:
+        query = query.filter(LayoutStateDB.user_id == user_id)
+    twin = query.first()
     if not twin:
         return False
     db.delete(twin)
@@ -29,8 +36,8 @@ def delete_twin(db: Session, twin_id: str) -> bool:
     return True
 
 
-def save_layout(db: Session, state: LayoutStateSchema) -> LayoutStateDB:
-    existing = get_layout(db, state.id)
+def save_layout(db: Session, state: LayoutStateSchema, user_id: str = None) -> LayoutStateDB:
+    existing = get_layout(db, state.id, user_id)
     if existing:
         existing.name = state.name
         existing.domain = state.domain
@@ -48,6 +55,7 @@ def save_layout(db: Session, state: LayoutStateSchema) -> LayoutStateDB:
     else:
         db_layout = LayoutStateDB(
             id=state.id,
+            user_id=user_id,
             name=state.name,
             domain=state.domain,
             width=state.width,
